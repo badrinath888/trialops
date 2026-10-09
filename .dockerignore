@@ -8,3 +8,6 @@
 .env
 backups
 exports
+
+artifacts/
+output/

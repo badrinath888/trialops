@@ -5,7 +5,9 @@
   "scripts": {
     "test": "node check.cjs",
     "test:ux": "node ux-check.cjs",
-    "test:workflows": "node workflow-check.cjs"
+    "test:workflows": "node workflow-check.cjs",
+    "test:visual": "node visual-review.cjs",
+    "test:release": "node release-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

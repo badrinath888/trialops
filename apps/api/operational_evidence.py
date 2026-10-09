@@ -44,7 +44,7 @@ def validate_operations(case, evidence):
         ):
             raise ValueError("Operational snapshot scope mismatch")
         observed = instant(snapshot["observed_at"])
-        snapshots.add(snapshot["id"])
+        snapshots.add((snapshot["id"], observed))
         for record in records:
             if record["snapshot_id"] != snapshot["id"] or record["id"] in record_ids:
                 raise ValueError("Operational record identity mismatch")
@@ -96,8 +96,9 @@ def build_operational_review(case, evidence, cited_ids):
         for record in group.get("records", []):
             if kind == "synchronization" and "KB-004" in cited_ids:
                 facts = [f"Job {record['id']} reported status '{record['status']}'."]
-                source, destination = record.get("source_updated_at"), record.get(
-                    "destination_updated_at"
+                source, destination = (
+                    record.get("source_updated_at"),
+                    record.get("destination_updated_at"),
                 )
                 if source and destination:
                     lag = (instant(source) - instant(destination)).total_seconds() / 60

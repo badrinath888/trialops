@@ -26,3 +26,7 @@ venv/
 coverage/
 playwright-report/
 test-results/
+
+artifacts/
+output/
+tmp/pdfs/

@@ -14,14 +14,18 @@ class Selection(BaseModel):
 
 def investigate(w, case):
     evidence, trace = collect_evidence(w, case)
+    return investigate_evidence(case, evidence, trace)
+
+
+def investigate_evidence(case, evidence, trace, mode=None, model=None):
     if not evidence.get("site") or evidence["site"]["study_id"] != case["study_id"]:
         raise ValueError("Study/site mismatch")
     validate_operations(case, evidence)
     articles = evidence.get("articles", [])
-    mode = os.getenv("AI_MODE", "procedure")
+    mode = mode or os.getenv("AI_MODE", "procedure")
     if mode == "ollama":
         payload = {
-            "model": os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
+            "model": model or os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
             "stream": False,
             "format": Selection.model_json_schema(),
             "options": {"temperature": 0, "num_predict": 300, "num_ctx": 8192},

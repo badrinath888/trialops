@@ -47,6 +47,8 @@ services:
       retries: 12
   worker:
     <<: *api
+    depends_on:
+      api: {condition: service_healthy}
     command: [python, worker.py]
     healthcheck:
       test: [CMD, python, -c, "import pathlib,time; p=pathlib.Path('/tmp/trialops-worker-heartbeat'); assert p.exists() and time.time()-p.stat().st_mtime<600"]

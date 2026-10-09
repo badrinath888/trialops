@@ -62,11 +62,11 @@ def seed(c, w):
     for n in [204, 205, 206]:
         c.execute(
             "INSERT INTO studies VALUES (%s,%s,%s)",
-            (w, f"CT-{n}", f"Synthetic Study {n-200}"),
+            (w, f"CT-{n}", f"Synthetic Study {n - 200}"),
         )
         c.execute(
             "INSERT INTO sites VALUES (%s,%s,%s,%s)",
-            (w, f"SITE-{n-100}", f"CT-{n}", f"Synthetic Research Site {n-200}"),
+            (w, f"SITE-{n - 100}", f"CT-{n}", f"Synthetic Research Site {n - 200}"),
         )
     for a in ARTICLES:
         c.execute(
@@ -147,3 +147,12 @@ def seed(c, w):
                 Jsonb(operations(site)),
             ),
         )
+
+    # Store immutable baseline procedure versions and snapshots for new workspaces.
+    c.execute(
+        "INSERT INTO procedure_versions(workspace_id,article_id,version,title,content,category) SELECT workspace_id,id,version,title,content,category FROM knowledge WHERE workspace_id=%s ON CONFLICT DO NOTHING",
+        (w,),
+    )
+    from workflows import remember_existing
+
+    remember_existing(c, w)

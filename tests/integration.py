@@ -4,6 +4,7 @@ Temporary accounts are removed in finally; no existing cases are modified.
 """
 
 import concurrent.futures, copy, http.cookiejar, json, os, sys, time, urllib.error, urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -37,7 +38,9 @@ class Client:
                 data = json.load(res)
         except urllib.error.HTTPError as e:
             status = e.code
-            data = json.load(e)
+            raw = e.read().decode()
+            try: data = json.loads(raw)
+            except ValueError: data = {"detail":raw}
         assert status == expected, (path, status, data)
         return data
 
@@ -195,7 +198,16 @@ def main():
         passed(
             "approval needs support, preserves open status, and rejects duplicate decisions"
         )
+        observation = a.call("/cases/CASE-4/evidence", {"id": str(uuid4()), "kind": "human_observation", "summary": "Personally reviewed current synthetic records for this test.", "observed_at": datetime.now(timezone.utc).isoformat()}, 201)
+        checklist = a.call("/runs/"+rid+"/checks", {}, 201)
+        checklist = a.call("/cases/CASE-4/checks/"+checklist["id"]+"/activate", {"expected_version": checklist["version"]})
+        for item in checklist["items"]:
+            item.update(state="verified", evidence_refs=[observation["id"]], notes="Current records checked by test reviewer.")
+        a.call("/cases/CASE-4/checks/"+checklist["id"], {"expected_version": checklist["version"], "items": checklist["items"]})
         body = {
+            "expected_updated_at": a.call("/cases/CASE-4")["case"]["updated_at"],
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "evidence_refs": [observation["id"]],
             "run_id": rid,
             "notes": "Verified current synthetic status and completed all checks.",
             "confirmed": True,
@@ -363,6 +375,14 @@ def main():
             "/catalog/studies", {"id": "CT-BLOCKED", "name": "Blocked study"}, 403
         )
         analyst.call("/export", expected=403)
+        analyst.call("/evaluations", expected=403)
+        analyst.call("/evaluations", {"id":str(uuid4()),"mode":"procedure"},403)
+        analyst.call("/policies", {"expected_version":1,"freshness_hours":24,"reminder_lead_hours":24,"reminder_frequency_minutes":60,"visit_checklist":[]},403)
+        cl=analyst.call("/runs/"+rr["id"]+"/checks",{},201)
+        analyst.call("/cases/CASE-4/checks/"+cl["id"]+"/activate",{"expected_version":cl["version"]},403)
+        analyst.call("/visits",{"id":str(uuid4()),"title":"Blocked analyst visit","study_id":"CT-204","site_id":"SITE-104","visit_at":datetime.now(timezone.utc).isoformat()},403)
+        owner.call("/walkthrough",expected=403)
+        owner.call("/walkthrough/updated-records",{},403)
         passed(
             "registered accounts, one-use invitations, workspace switching, and server-enforced analyst permissions"
         )

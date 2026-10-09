@@ -1,0 +1,8 @@
+# Local application rollback; retains the additive database schema and volumes.
+services:
+  api:
+    image: trialops-release-api:pre-integrated-20261009
+  worker:
+    image: trialops-release-worker:pre-integrated-20261009
+  web:
+    image: trialops-release-web:pre-integrated-20261009

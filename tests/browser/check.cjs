@@ -16,7 +16,7 @@ if(process.env.CHROMIUM_ARGS)options.args=JSON.parse(process.env.CHROMIUM_ARGS);
  try{
   await goto('/');await visible(page.getByRole('heading',{name:/Every issue/}));
   await page.screenshot({path:path.join(out,'landing-desktop.png'),fullPage:true});
-  await page.getByRole('button',{name:'Explore a sample case'}).click();
+  await page.getByRole('button',{name:'Explore a sample case',exact:true}).first().click();
   await page.waitForURL('**/workspace');await visible(page.getByRole('heading',{name:"Workspace overview"}));
   console.log('PASS: public landing and isolated sample onboarding');
   await goto('/workspace/cases/CASE-4');await page.getByRole('button',{name:'Run investigation',exact:true}).click();
@@ -33,8 +33,19 @@ if(process.env.CHROMIUM_ARGS)options.args=JSON.parse(process.env.CHROMIUM_ARGS);
 
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:path.join(out,'investigation-desktop.png'),fullPage:false});
+  const prepared = await page.evaluate(async()=>{
+   async function call(path,body){const r=await fetch('/api'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));return d;}
+   const detail=await call('/cases/CASE-4'),rid=detail.runs[0].id;
+   const e=await call('/cases/CASE-4/evidence',{id:crypto.randomUUID(),kind:'human_observation',summary:'Browser test personally verified current synthetic binder records.',observed_at:new Date().toISOString()});
+   let c=await call('/runs/'+rid+'/checks',{});c=await call('/cases/CASE-4/checks/'+c.id+'/activate',{expected_version:c.version});
+   c.items.forEach(i=>{i.state='verified';i.notes='Current synthetic record manually verified.';i.evidence_refs=[e.id]});
+   await call('/cases/CASE-4/checks/'+c.id,{expected_version:c.version,items:c.items});return e.id;
+  });
+  await goto('/workspace/cases/CASE-4');
+  await page.getByLabel('Resolution supporting evidence',{exact:true}).selectOption(prepared);
+  const verification=new Date();await page.getByLabel('Current verification time',{exact:true}).fill(new Date(verification.getTime()-verification.getTimezoneOffset()*60000).toISOString().slice(0,19));
   await page.getByLabel('Resolution note',{exact:true}).fill('Synthetic demo: verified the necessary current checks and completed the case.');
-  await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Mark case resolved',exact:true}).click();
+  await page.getByRole('checkbox',{name:/I verified current status/}).check();await page.getByRole('button',{name:'Mark case resolved',exact:true}).click();
   await visible(page.getByText('Case marked resolved.',{exact:true}));
   await page.getByLabel('Reason for reopening',{exact:true}).fill('Reopen the synthetic case to verify updated operational conditions.');
   await page.getByRole('button',{name:'Reopen case',exact:true}).click();

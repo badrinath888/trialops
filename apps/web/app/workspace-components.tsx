@@ -18,7 +18,7 @@ export function usePreferences(userId?: string) {
   return prefs;
 }
 export function DataTable<T>({ label, columns, rows, rowKey, empty }: { label: string; columns: { label: string; render: (row: T) => React.ReactNode }[]; rows: T[]; rowKey: (row: T) => string; empty?: React.ReactNode }) {
-  return <div className="data-table-wrap"><table className="data-table" aria-label={label}><thead><tr>{columns.map(c => <th key={c.label} scope="col">{c.label}</th>)}</tr></thead><tbody>{rows.length ? rows.map(row => <tr key={rowKey(row)}>{columns.map(c => <td key={c.label}>{c.render(row)}</td>)}</tr>) : <tr><td colSpan={columns.length}>{empty || "No matching records."}</td></tr>}</tbody></table></div>;
+  return <div className="data-table-wrap" role="region" aria-label={label + " table; scroll for more columns"} tabIndex={0}><table className="data-table" aria-label={label}><thead><tr>{columns.map(c => <th key={c.label} scope="col">{c.label}</th>)}</tr></thead><tbody>{rows.length ? rows.map(row => <tr key={rowKey(row)}>{columns.map(c => <td key={c.label}>{c.render(row)}</td>)}</tr>) : <tr><td colSpan={columns.length}>{empty || "No matching records."}</td></tr>}</tbody></table></div>;
 }
 export function CasePreview({ caseId, onClose }: { caseId: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), invoker = useRef<HTMLElement | null>(null);
@@ -27,7 +27,7 @@ export function CasePreview({ caseId, onClose }: { caseId: string; onClose: () =
   useEffect(() => { let active = true; setData(null); setError(""); api("/cases/" + encodeURIComponent(caseId)).then(r => { if (active) setData(r); }).catch(e => { if (active) setError(e.message); }); return () => { active = false; }; }, [caseId]);
   const c = data?.case;
   return <dialog ref={dialog} className="case-preview" aria-labelledby="case-preview-title" onClose={onClose} onKeyDown={event=>{if(event.key!=="Tab")return;const elements=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]')).filter(e=>e.getClientRects().length);const first=elements[0],last=elements.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}}>
-    <div className="section-heading"><span className="subtle">{caseId}</span><button className="outline" onClick={() => dialog.current?.close()}>Close preview</button></div>
+    <div className="section-heading"><span className="case-id-chip">{caseId}</span><button className="outline" onClick={() => dialog.current?.close()}>Close preview</button></div>
     <h2 id="case-preview-title">{c?.title || "Opening case…"}</h2>
     {error && <p role="alert" className="error">{error}</p>}
     {!c && !error && <p role="status">Loading case details…</p>}

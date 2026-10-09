@@ -1,25 +1,23 @@
-# TrialOps 1.4.1 · Graphite & Copper
+# TrialOps 2.0 · Graphite & Copper
 
-For the tested update flow and cleanup scope, begin with [START-HERE.md](START-HERE.md). Run `bash update-existing.sh ~/Downloads/trialops-release` from this separately extracted package to update your existing Mac installation. It preserves the original Docker project and database.
+Work directly in `~/Downloads/trialops-release`; keep using http://localhost:3001. This integrated release adds reviewed investigation checks, information requests, immutable comparisons, current-evidence resolution, measured activity, monitoring preparation, reminders, preview imports, complete case packages, versioned evaluations and a resumable sample walkthrough.
 
-The release improves desktop Overview, Cases, Investigation, Knowledge, and Settings workflows. It adds scoped case-view API filters while preserving the worker, database schema, and evidence policies. See [WORKFLOW-UPDATE.md](WORKFLOW-UPDATE.md) and [TEST-REPORT.md](TEST-REPORT.md).
-
-> Existing installation? Start with START-HERE.md and use update-existing.sh. Do not initialize a second copy against your existing release database.
+Begin with [START-HERE.md](START-HERE.md), [RELEASE-2.0.md](RELEASE-2.0.md) and [RELEASE-VERIFICATION.md](RELEASE-VERIFICATION.md). Existing accounts, data, configuration and secrets are preserved by additive migrations.
 
 # Application reference
 
 A complete application for clinical operations **support evaluation**: submit an issue, find documented procedures, inspect historical operational records, review an investigation, and record resolution. It is not a patient-care system or an enterprise compliance-certified platform.
 
-This release installs separately from your earlier `trialops-ai` project. It does not migrate or modify that project's database. Your existing backup remains useful for that project.
+This project remains separate from any older `trialops-ai` installation. Its stable Docker project is `trialops-release`.
 
 ## Start on your Mac
 
 1. Open Docker Desktop and wait until it is running.
-2. Extract this folder into Downloads. For an existing installation, use the upgrade instructions in START-HERE.md.
+2. For an existing installation, follow START-HERE.md in this project. Use the installer only for a clean installation.
 3. In Terminal run:
 
 ```bash
-cd ~/Downloads/trialops-1.4.1
+cd ~/Downloads/trialops-release
 bash install.sh
 ```
 
@@ -33,7 +31,7 @@ The installer detects local `qwen2.5:7b` and `nomic-embed-text:v1.5`. If both ar
 2. Select **Run investigation**. The job continues if you leave the page.
 3. Inspect the cited procedure, its version, the dated snapshot, and any unsent drafts. A recorded condition does not establish current status or root cause.
 4. Add review notes and approve or reject the documented recommendation.
-5. If you have completed the necessary checks for this synthetic scenario, record resolution separately with a note and confirmation. Approval alone does not close the case.
+5. In **Evidence & follow-up**, suggest checks, review/edit and activate them, record a current human observation, and assess each check with evidence. Resolve separately with that observation, reviewer notes, verification time and explained exceptions. Approval alone does not close the case.
 6. Reopen the case with a reason if needed. Both events remain in activity.
 7. Reopen the saved investigation from **Investigations**; its evidence is frozen even after procedures or snapshots change.
 8. Try **Unsupported request** from the sample scenarios. An unrelated request should abstain; approval is blocked. Try **Healthy status check**: no failed-job or 15-minute certificate escalation should appear.
@@ -86,7 +84,7 @@ npm run test:ux
 npm run test:workflows
 ```
 
-Use `TEST_WEB_URL=https://your-hostname npm test` for the hosted test instance. The baseline checks create one sample workspace that expires normally. The optional UX check creates two synthetic permanent accounts; the desktop workflow check creates one more account; discard its isolated test database afterwards. screenshots and a synthetic export are written in the test directory. Do not point automated tests at a sensitive deployment.
+Use `TEST_WEB_URL=https://your-hostname npm test` for the hosted test instance. The baseline checks create one sample workspace that expires normally. The optional UX check creates two synthetic permanent accounts; the desktop workflow check creates one more account; preserve the test database when it contains user accounts or records; never reset it as part of release verification. screenshots and a synthetic export are written in the test directory. Do not point automated tests at a sensitive deployment.
 
 See `TEST-REPORT.md` for checks performed while preparing this package and their limits.
 

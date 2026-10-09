@@ -89,10 +89,7 @@ export default function Landing() {
             aria-label="Illustrative investigation preview"
           >
             <div className="preview-chrome">
-              <i />
-              <i />
-              <i />
-              <span>trialops / investigation</span>
+              <span>Sample investigation</span>
             </div>
             <div className="preview-body">
               <div className="preview-tag">ILLUSTRATIVE SAMPLE · CT-204</div>
@@ -101,13 +98,11 @@ export default function Landing() {
                 <br />
                 from the binder.
               </h2>
-              <p className="subtle">
-                An operational issue. A traceable investigation.
-              </p>
+
               <WorkflowDemo />
               <div className="preview-footer">
                 <span className="badge pending">Awaiting review</span>
-                <span>Evidence → decision</span>
+
               </div>
             </div>
           </div>
@@ -252,7 +247,7 @@ export default function Landing() {
             <em>More clarity.</em>
           </h2>
           <button onClick={start} disabled={busy} aria-busy={busy}>
-            Try the full workflow <Icon name="arrow" size={17} />
+            Explore a sample case <Icon name="arrow" size={17} />
           </button>
         </section>
       </main>

@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 def claim():
     with connect() as c:
         expired = c.execute(
-            "UPDATE jobs SET status='failed',error='Worker interrupted. Retry the task.',finished_at=now(),lease_token=NULL WHERE status='running' AND started_at<now()-interval '10 minutes' RETURNING workspace_id,kind,target_id"
+            "UPDATE jobs SET status='failed',error='Worker interrupted. Retry the task.',finished_at=now(),lease_token=NULL WHERE status='running' AND coalesce(lease_expires_at,started_at+interval '10 minutes')<now() RETURNING workspace_id,kind,target_id"
         ).fetchall()
         for item in expired:
             if item["kind"] == "index":
@@ -27,7 +27,7 @@ def claim():
             return None
         token = uuid4()
         c.execute(
-            "UPDATE jobs SET status='running',started_at=now(),attempts=attempts+1,lease_token=%s WHERE id=%s",
+            "UPDATE jobs SET status='running',started_at=now(),attempts=attempts+1,lease_token=%s,lease_expires_at=now()+interval '10 minutes' WHERE id=%s",
             (token, job["id"]),
         )
         job["lease_token"] = token
@@ -37,6 +37,47 @@ def claim():
 def process(job):
     started = time.monotonic()
     w = job["workspace_id"]
+    if job["kind"] == "evaluate":
+        from evaluation import evaluate
+        from reminders import scan_reminders
+
+        entry = one(
+            "SELECT * FROM evaluation_runs WHERE workspace_id=%s AND id=%s",
+            (w, job["target_id"]),
+        )
+        if not entry:
+            raise ValueError("Evaluation removed")
+
+        def renew():
+            with connect() as c:
+                lease = c.execute(
+                    "UPDATE jobs SET lease_expires_at=now()+interval '10 minutes' WHERE id=%s AND lease_token=%s AND status='running' RETURNING id",
+                    (job["id"], job["lease_token"]),
+                ).fetchone()
+                if not lease:
+                    raise ValueError("Evaluation lease lost")
+            scan_reminders()
+
+        result = evaluate(entry["configuration"], renew)
+        with connect() as c:
+            lease = c.execute(
+                "SELECT * FROM jobs WHERE id=%s FOR UPDATE", (job["id"],)
+            ).fetchone()
+            if (
+                not lease
+                or lease["status"] != "running"
+                or lease["lease_token"] != job["lease_token"]
+            ):
+                return
+            c.execute(
+                "UPDATE evaluation_runs SET results=%s,finished_at=now() WHERE workspace_id=%s AND id=%s",
+                (Jsonb(result), w, entry["id"]),
+            )
+            c.execute(
+                "UPDATE jobs SET status='completed',finished_at=now(),result_id=%s WHERE id=%s",
+                (entry["id"], job["id"]),
+            )
+        return
     if job["kind"] == "index":
         article = one(
             "SELECT * FROM knowledge WHERE workspace_id=%s AND id=%s",
@@ -139,6 +180,16 @@ def process(job):
                 ),
             ),
         )
+        from workflows import procedure_impact
+
+        for source in result.get("sources", []):
+            if source["id"] in result["recommendation"]["evidence_ids"]:
+                article = c.execute(
+                    "SELECT version FROM knowledge WHERE workspace_id=%s AND id=%s",
+                    (w, source["article_id"]),
+                ).fetchone()
+                if article and article["version"] > source["version"]:
+                    procedure_impact(c, w, source["article_id"], article["version"])
         user = c.execute(
             "SELECT name FROM users WHERE id=%s", (job["actor_id"],)
         ).fetchone()
@@ -177,6 +228,8 @@ def run_once():
         message = (
             "Investigation failed. Check the model connection and retry. No decision or external action was executed."
             if job["kind"] == "investigate"
+            else "Evaluation failed. Retry the evaluation; no operational cases were changed."
+            if job["kind"] == "evaluate"
             else "Embedding failed. Text search remains available. Check the model and save the procedure again to retry."
         )
         with connect() as c:
@@ -205,12 +258,18 @@ def cleanup():
 
 if __name__ == "__main__":
     last = 0
+    last_reminders = 0
     while True:
         try:
             Path("/tmp/trialops-worker-heartbeat").touch()
             if time.monotonic() - last > 300:
                 cleanup()
                 last = time.monotonic()
+            if time.monotonic() - last_reminders > 60:
+                from reminders import scan_reminders
+
+                scan_reminders()
+                last_reminders = time.monotonic()
             if not run_once():
                 time.sleep(1)
         except Exception:

@@ -1,0 +1,16 @@
+# Entirely separate project/volume/images; never use without -p trialops-release-test.
+services:
+  api:
+    environment:
+      AI_MODE: procedure
+      DEMO_HOURLY_LIMIT: "500"
+      DEMO_IP_HOURLY_LIMIT: "500"
+      SIGNUP_HOURLY_LIMIT: "200"
+      REGISTER_IP_HOURLY_LIMIT: "200"
+  worker:
+    environment:
+      AI_MODE: procedure
+  web:
+    environment:
+      APP_ORIGIN: http://localhost:3002
+    ports: !override ["127.0.0.1:3002:3000"]

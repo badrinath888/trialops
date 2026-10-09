@@ -1,4 +1,4 @@
-import hmac, json, logging, os, secrets
+import hmac, json, logging, os, re, secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 from fastapi import (
@@ -19,10 +19,11 @@ from models import *
 from seed import seed, operations
 from content import chunks, extract
 from operational_evidence import validate_operations
+from workflows import save_snapshot, procedure_impact
 
 app = FastAPI(
     title="TrialOps",
-    version="1.4.1",
+    version="2.0.0",
     docs_url="/docs" if os.getenv("ENABLE_API_DOCS") == "true" else None,
     redoc_url=None,
 )
@@ -56,7 +57,7 @@ async def protection(request, call_next):
 @app.get("/health")
 def health():
     one("SELECT 1")
-    return {"status": "ok", "version": "1.3.0"}
+    return {"status": "ok", "version": "2.0.0"}
 
 
 def session(response, user, workspace, guest=False):
@@ -147,7 +148,7 @@ def get_run(a, run_id, c=None, lock=False):
 def demo(request: Request, response: Response):
     if os.getenv("ENABLE_DEMO", "true") != "true":
         raise HTTPException(403, "Sample workspaces are disabled.")
-    rate("demo:" + request.headers.get("x-client-ip", "unknown"), 10)
+    rate("demo:" + request.headers.get("x-client-ip", "unknown"), int(os.getenv("DEMO_IP_HOURLY_LIMIT", "10")))
     rate("demo-global", int(os.getenv("DEMO_HOURLY_LIMIT", "100")))
     u = uuid4()
     with connect() as c:
@@ -164,7 +165,7 @@ def demo(request: Request, response: Response):
 def register(body: Register, request: Request, response: Response):
     if os.getenv("ENABLE_SIGNUP", "true") != "true":
         raise HTTPException(403, "Account registration is disabled.")
-    rate("register:" + request.headers.get("x-client-ip", "unknown"), 5)
+    rate("register:" + request.headers.get("x-client-ip", "unknown"), int(os.getenv("REGISTER_IP_HOURLY_LIMIT", "5")))
     rate("register-global", int(os.getenv("SIGNUP_HOURLY_LIMIT", "50")))
     hashed = password_hash(body.password)
     u = uuid4()
@@ -385,21 +386,33 @@ def dashboard(a=Depends(actor)):
         (w,),
     )
     overdue = query(
-        "SELECT id,title,study_id,site_id,due_at,count(*) OVER() AS total FROM cases WHERE workspace_id=%s AND status='open' AND due_at<now() ORDER BY due_at,id LIMIT 5", (w,),
+        "SELECT id,title,study_id,site_id,due_at,count(*) OVER() AS total FROM cases WHERE workspace_id=%s AND status='open' AND due_at<now() ORDER BY due_at,id LIMIT 5",
+        (w,),
     )
     unassigned = query(
-        "SELECT id,title,study_id,site_id,count(*) OVER() AS total FROM cases WHERE workspace_id=%s AND status='open' AND priority='high' AND owner_id IS NULL ORDER BY created_at DESC,id LIMIT 5", (w,),
+        "SELECT id,title,study_id,site_id,count(*) OVER() AS total FROM cases WHERE workspace_id=%s AND status='open' AND priority='high' AND owner_id IS NULL ORDER BY created_at DESC,id LIMIT 5",
+        (w,),
     )
     reviews = query(
         """SELECT r.id,r.case_id,c.title,r.created_at,count(*) OVER() AS total
         FROM runs r JOIN cases c ON c.workspace_id=r.workspace_id AND c.id=r.case_id
         WHERE r.workspace_id=%s AND c.status='open' AND r.decision IS NULL
         AND NOT EXISTS(SELECT 1 FROM runs newer WHERE newer.workspace_id=r.workspace_id AND newer.case_id=r.case_id AND (newer.created_at,newer.id)>(r.created_at,r.id))
-        ORDER BY r.created_at,r.id LIMIT 5""", (w,),
+        ORDER BY r.created_at,r.id LIMIT 5""",
+        (w,),
     )
-    attention = {name: {"items": rows, "total": rows[0]["total"] if rows else 0}
-                 for name, rows in [("overdue",overdue),("unassigned",unassigned),("reviews",reviews)]}
-    recent = query("SELECT id,title,status,priority,study_id,site_id,updated_at FROM cases WHERE workspace_id=%s ORDER BY updated_at DESC,id LIMIT 5", (w,))
+    attention = {
+        name: {"items": rows, "total": rows[0]["total"] if rows else 0}
+        for name, rows in [
+            ("overdue", overdue),
+            ("unassigned", unassigned),
+            ("reviews", reviews),
+        ]
+    }
+    recent = query(
+        "SELECT id,title,status,priority,study_id,site_id,updated_at FROM cases WHERE workspace_id=%s ORDER BY updated_at DESC,id LIMIT 5",
+        (w,),
+    )
     return {**counts, **runs, **roi, "attention": attention, "recent_cases": recent}
 
 
@@ -412,8 +425,22 @@ def cases(
     view: Literal["all", "mine", "review", "overdue", "unassigned"] = "all",
     a=Depends(actor),
 ):
-    params = (a["workspace_id"], status, "%" + q + "%", priority, priority)
-    condition = "c.workspace_id=%s AND c.status=%s AND (c.title||' '||c.id||' '||c.study_id||' '||c.site_id) ILIKE %s AND (%s='' OR c.priority=%s)"
+    # Numeric aliases refer to a case ID, not a study/site number or CASE-10.
+    number = re.fullmatch(r"(?:case[\s-]*)?([0-9]+)", q.strip(), re.IGNORECASE)
+    search = (
+        "c.id=%s"
+        if number
+        else "(c.title||' '||c.id||' '||c.study_id||' '||c.site_id) ILIKE %s"
+    )
+    needle = (
+        "CASE-" + (number[1].lstrip("0") or "0") if number else "%" + q.strip() + "%"
+    )
+    params = (a["workspace_id"], status, needle, priority, priority)
+    condition = (
+        "c.workspace_id=%s AND c.status=%s AND "
+        + search
+        + " AND (%s='' OR c.priority=%s)"
+    )
     if view == "mine":
         condition += " AND c.owner_id=%s"
         params += (a["user_id"],)
@@ -428,7 +455,11 @@ def cases(
           AND (newer.created_at,newer.id)>(latest.created_at,latest.id)))"""
     total = one("SELECT count(*) AS n FROM cases c WHERE " + condition, params)["n"]
     rows = query(
-        "SELECT c.*,u.name AS owner_name FROM cases c LEFT JOIN users u ON u.id=c.owner_id WHERE "
+        """SELECT c.*,u.name AS owner_name,
+          (SELECT COALESCE(r.decision,'pending') FROM runs r
+           WHERE r.workspace_id=c.workspace_id AND r.case_id=c.id
+           ORDER BY r.created_at DESC,r.id DESC LIMIT 1) AS review_status
+          FROM cases c LEFT JOIN users u ON u.id=c.owner_id WHERE """
         + condition
         + " ORDER BY c.updated_at DESC,c.id LIMIT 25 OFFSET %s",
         (*params, offset),
@@ -440,6 +471,32 @@ def cases(
 def create_case(body: NewCase, a=Depends(actor)):
     rate("case:" + str(a["workspace_id"]), 50)
     with connect() as c:
+        c.execute(
+            "SELECT id FROM workspaces WHERE id=%s FOR UPDATE", (a["workspace_id"],)
+        )
+        if body.submission_id:
+            old = c.execute(
+                "SELECT * FROM cases WHERE workspace_id=%s AND submission_id=%s",
+                (a["workspace_id"], body.submission_id),
+            ).fetchone()
+            if old:
+                if any(
+                    old[k] != getattr(body, k)
+                    for k in (
+                        "title",
+                        "description",
+                        "study_id",
+                        "site_id",
+                        "category",
+                        "priority",
+                        "due_at",
+                    )
+                ):
+                    raise HTTPException(
+                        409, "Submission identifier contains a different case."
+                    )
+                return old
+
         if not c.execute(
             "SELECT id FROM sites WHERE workspace_id=%s AND id=%s AND study_id=%s",
             (a["workspace_id"], body.site_id, body.study_id),
@@ -455,8 +512,8 @@ def create_case(body: NewCase, a=Depends(actor)):
             raise HTTPException(422, "Workspace case limit reached (500).")
         cid = "CASE-" + str(uuid4())[:12]
         case = c.execute(
-            """INSERT INTO cases(workspace_id,id,study_id,site_id,title,description,category,priority,due_at)
-          VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
+            """INSERT INTO cases(workspace_id,id,study_id,site_id,title,description,category,priority,due_at,submission_id)
+          VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
             (
                 a["workspace_id"],
                 cid,
@@ -467,6 +524,7 @@ def create_case(body: NewCase, a=Depends(actor)):
                 body.category,
                 body.priority,
                 body.due_at,
+                body.submission_id,
             ),
         ).fetchone()
         event(c, a, cid, "case_created", "Case submitted by " + a["name"])
@@ -496,7 +554,9 @@ def detail(case_id: str, a=Depends(actor)):
 @app.post("/cases/{case_id}/assignment")
 def assignment(case_id: str, body: Assignment, a=Depends(actor)):
     with connect() as c:
-        get_case(a, case_id, c, True)
+        old = get_case(a, case_id, c, True)
+        if body.expected_updated_at and body.expected_updated_at != old["updated_at"]:
+            raise HTTPException(409, "Assignment changed. Reload before saving.")
         if (
             body.owner_id
             and not c.execute(
@@ -596,6 +656,7 @@ def saved_run(run_id: UUID, a=Depends(actor)):
 @app.get("/runs/{run_id}/report.pdf")
 def investigation_pdf(run_id: UUID, a=Depends(actor)):
     from report import build_report
+
     # Use the same scoped saved-run access as the JSON investigation endpoint.
     with connect() as c:
         c.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
@@ -621,6 +682,8 @@ def investigation_pdf(run_id: UUID, a=Depends(actor)):
 def decision(run_id: UUID, body: Decision, a=Depends(actor)):
     require(a)
     with connect() as c:
+        initial = get_run(a, run_id, c)
+        get_case(a, initial["case_id"], c, True)
         run = get_run(a, run_id, c, True)
         if run["decision"]:
             raise HTTPException(409, "A review decision has already been recorded.")
@@ -662,11 +725,97 @@ def resolve(case_id: str, body: Resolve, a=Depends(actor)):
             raise HTTPException(
                 422, "Choose an approved, supported investigation for this case."
             )
+
+        from release_api import refs
+        from workflows import STATES
+
+        if body.expected_updated_at != case["updated_at"]:
+            raise HTTPException(409, "Case changed. Reload before resolving.")
+        now = datetime.now(timezone.utc)
+        cycle = c.execute(
+            "SELECT created_at FROM case_events WHERE workspace_id=%s AND case_id=%s AND event_type='case_reopened' ORDER BY id DESC LIMIT 1",
+            (a["workspace_id"], case_id),
+        ).fetchone()
+        cycle_start = cycle["created_at"] if cycle else case["created_at"]
+        if body.verified_at > now or body.verified_at < cycle_start:
+            raise HTTPException(
+                422,
+                "Verification time must be within the current open case cycle and cannot be in the future.",
+            )
+        refs(c, a, case_id, body.evidence_refs)
+        evidence = c.execute(
+            "SELECT * FROM case_evidence WHERE workspace_id=%s AND case_id=%s AND id=ANY(%s)",
+            (a["workspace_id"], case_id, body.evidence_refs),
+        ).fetchall()
+        if not any(
+            e["kind"] == "human_observation"
+            and cycle_start <= e["observed_at"] <= body.verified_at
+            for e in evidence
+        ):
+            raise HTTPException(
+                422,
+                "Record a human observation from the current case cycle. Historical snapshots alone cannot verify resolution.",
+            )
+        checks = c.execute(
+            "SELECT * FROM investigation_checks WHERE workspace_id=%s AND case_id=%s AND run_id=%s",
+            (a["workspace_id"], case_id, body.run_id),
+        ).fetchall()
+        if not checks or any(ch["status"] != "active" for ch in checks):
+            raise HTTPException(
+                422, "Activate the reviewed investigation checks before resolving."
+            )
+        items = [i for ch in checks for i in ch["items"]]
+        if any(i["state"] == "not_checked" for i in items):
+            raise HTTPException(
+                422, "Complete the unchecked investigation checks before resolving."
+            )
+        if (
+            any(i["state"] in {"needs_follow_up", "not_applicable"} for i in items)
+            and len(body.exceptions.strip()) < 10
+        ):
+            raise HTTPException(
+                422,
+                "Explain unresolved follow-up or not-applicable exceptions in the resolution.",
+            )
         c.execute(
             "UPDATE cases SET status='resolved',resolution=%s,resolved_by=%s,resolved_at=now(),updated_at=now() WHERE workspace_id=%s AND id=%s",
             (body.notes, a["user_id"], a["workspace_id"], case_id),
         )
-        event(c, a, case_id, "case_resolved", body.notes, body.run_id)
+        event(
+            c,
+            a,
+            case_id,
+            "case_resolved",
+            body.notes,
+            body.run_id,
+            {
+                "reviewer_id": str(a["user_id"]),
+                "reviewer_name": a["name"],
+                "verified_at": body.verified_at.isoformat(),
+                "exceptions": body.exceptions,
+                "evidence": [
+                    {
+                        **e,
+                        "id": str(e["id"]),
+                        "workspace_id": str(e["workspace_id"]),
+                        "actor_id": str(e["actor_id"]) if e["actor_id"] else None,
+                        "observed_at": e["observed_at"].isoformat(),
+                        "created_at": e["created_at"].isoformat(),
+                    }
+                    for e in evidence
+                ],
+                "checks": [
+                    {
+                        "id": str(ch["id"]),
+                        "version": ch["version"],
+                        "sources": ch["sources"],
+                        "items": ch["items"],
+                    }
+                    for ch in checks
+                ],
+                "historical_evidence_is_current_verification": False,
+            },
+        )
     return {"status": "resolved", "external_actions_executed": []}
 
 
@@ -723,6 +872,17 @@ def save_knowledge(a, body, article_id=None):
                 raise HTTPException(
                     409, "This procedure changed. Reload it before saving."
                 )
+            c.execute(
+                "INSERT INTO procedure_versions(workspace_id,article_id,version,title,content,category) VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                (
+                    a["workspace_id"],
+                    article_id,
+                    old["version"],
+                    old["title"],
+                    old["content"],
+                    old["category"],
+                ),
+            )
             version = old["version"] + 1
             c.execute(
                 "UPDATE knowledge SET title=%s,content=%s,category=%s,version=%s,indexing_status='queued',indexing_error=NULL,updated_at=now() WHERE workspace_id=%s AND id=%s",
@@ -758,6 +918,20 @@ def save_knowledge(a, body, article_id=None):
                     body.category,
                 ),
             )
+        c.execute(
+            "INSERT INTO procedure_versions(workspace_id,article_id,version,title,content,category,actor_id) VALUES(%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+            (
+                a["workspace_id"],
+                article_id,
+                version,
+                body.title,
+                body.content,
+                body.category,
+                a["user_id"],
+            ),
+        )
+        if article_id and version > 1:
+            procedure_impact(c, a["workspace_id"], article_id, version)
         for i, text in enumerate(chunks(body.content), 1):
             c.execute(
                 "INSERT INTO knowledge_chunks(workspace_id,article_id,version,number,content) VALUES(%s,%s,%s,%s,%s)",
@@ -832,13 +1006,21 @@ def import_records(body: Operations, a=Depends(actor)):
         (a["workspace_id"], body.study_id, body.site_id),
     ):
         raise HTTPException(422, "Study and site assignment mismatch.")
-    query(
-        """INSERT INTO operations(workspace_id,study_id,site_id,evidence) VALUES(%s,%s,%s,%s)
-        ON CONFLICT(workspace_id,study_id,site_id) DO UPDATE SET evidence=EXCLUDED.evidence,updated_at=now() RETURNING site_id""",
-        (a["workspace_id"], body.study_id, body.site_id, Jsonb(body.evidence)),
-    )
+    with connect() as c:
+        c.execute(
+            "SELECT id FROM workspaces WHERE id=%s FOR UPDATE", (a["workspace_id"],)
+        )
+        row, created = save_snapshot(
+            c,
+            a["workspace_id"],
+            body.study_id,
+            body.site_id,
+            body.evidence,
+            a["user_id"],
+        )
     return {
-        "status": "saved",
+        "status": "saved" if created else "already_saved",
+        "snapshot_id": row["id"],
         "message": "New investigations use this snapshot. Saved investigations retain their original records.",
     }
 
@@ -927,7 +1109,7 @@ def export(a=Depends(actor)):
     require(a, ("owner",))
     w = a["workspace_id"]
     return {
-        "version": "1.3.0",
+        "version": "2.0.0",
         "exported_at": datetime.now(timezone.utc),
         "workspace": a["workspace_name"],
         "cases": query("SELECT * FROM cases WHERE workspace_id=%s", (w,)),
@@ -941,4 +1123,29 @@ def export(a=Depends(actor)):
         ),
         "operations": query("SELECT * FROM operations WHERE workspace_id=%s", (w,)),
         "roi": query("SELECT * FROM roi_scenarios WHERE workspace_id=%s", (w,)),
+        "workflows": {
+            table: query(f"SELECT * FROM {table} WHERE workspace_id=%s", (w,))
+            for table in (
+                "workspace_policies",
+                "procedure_versions",
+                "snapshot_history",
+                "investigation_checks",
+                "information_requests",
+                "case_evidence",
+                "snapshot_comparisons",
+                "case_links",
+                "procedure_reassessments",
+                "human_effort",
+                "monitoring_visits",
+                "notification_preferences",
+                "notifications",
+                "evaluation_runs",
+                "walkthrough_progress",
+            )
+        },
     }
+
+
+from release_api import router as release_router
+
+app.include_router(release_router)

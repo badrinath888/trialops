@@ -6,7 +6,22 @@ import { api, ApiError, categories, download, money, stamp } from "../../lib";
 import { Icon } from "../../ui";
 import JobProgress from "../../job-progress";
 import CaseList from "../../case-list";
-import { CasePreview, DataTable, usePreferences, readPreferences, savePreferences, DisplayPreferences } from "../../workspace-components";
+import {
+  CasePreview,
+  DataTable,
+  usePreferences,
+  readPreferences,
+  savePreferences,
+  DisplayPreferences,
+} from "../../workspace-components";
+
+import { CaseWorkflows, EvidenceResolution } from "../../evidence-workflows";
+import {
+  OverviewRelease,
+  KnowledgeRelease,
+  RecordsRelease,
+  WorkspacePolicies,
+} from "../../release-panels";
 
 type Row = Record<string, any>;
 function Badge({ value }: { value: string }) {
@@ -44,7 +59,12 @@ function FieldCategory({
   disabled?: boolean;
 }) {
   return (
-    <select aria-label="Category" disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select
+      aria-label="Category"
+      disabled={disabled}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
       {categories.map(([v, l]) => (
         <option key={v} value={v}>
           {l}
@@ -92,6 +112,14 @@ export default function Workspace() {
   const [me, setMe] = useState<Row | null>(null),
     [error, setError] = useState(""),
     [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const lastPath = useRef(path);
+  useEffect(() => {
+    if (lastPath.current !== path) {
+      lastPath.current = path;
+      document.getElementById("main-content")?.focus({ preventScroll: true });
+    }
+  }, [path]);
   useEffect(() => {
     api("/auth/me")
       .then(setMe)
@@ -132,27 +160,47 @@ export default function Workspace() {
         <Link href="/" className="wordmark">
           TrialOps<span>✳</span>
         </Link>
-        <div className="workspace-label">
-          <small>{me.demo ? "SAMPLE WORKSPACE" : "YOUR WORKSPACE"}</small>
+        <div className="workspace-label workspace-header-compact">
           <strong>{me.workspace_name}</strong>
-          <Badge value={me.role} />
+          <small>
+            {me.demo ? "Sample workspace · " : ""}
+            {me.role === "owner"
+              ? "Workspace admin"
+              : me.role === "reviewer"
+                ? "Reviewer"
+                : "Analyst"}
+          </small>
         </div>
         <button
+          ref={menuButton}
           className="mobile-menu-toggle outline"
+          aria-controls="workspace-navigation"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen(!menuOpen)}
         >
           Menu <Icon name="grid" size={14} />
         </button>
         <nav
+          id="workspace-navigation"
           className={menuOpen ? "expanded" : ""}
           aria-label="Workspace navigation"
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && menuOpen) {
+              setMenuOpen(false);
+              menuButton.current?.focus();
+            }
+          }}
         >
           {navigation.map(([href, label, icon]) => (
             <Link
               key={href}
               href={href}
               onClick={() => setMenuOpen(false)}
+              aria-current={
+                (href === "/workspace" ? path === href : path.startsWith(href))
+                  ? "page"
+                  : undefined
+              }
               className={
                 (href === "/workspace" ? path === href : path.startsWith(href))
                   ? "active"
@@ -172,7 +220,17 @@ export default function Workspace() {
           <button className="outline" onClick={logout}>
             Sign out
           </button>
-          <div className="user-identity"><span className="avatar" aria-hidden="true">{me.name.split(/\s+/).slice(0,2).map((n:string)=>n[0]).join("").toUpperCase()}</span><span>{me.name}</span></div>
+          <div className="user-identity">
+            <span className="avatar" aria-hidden="true">
+              {me.name
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((n: string) => n[0])
+                .join("")
+                .toUpperCase()}
+            </span>
+            <span>{me.name}</span>
+          </div>
         </div>
       </aside>
       <div className="app-main">
@@ -192,10 +250,13 @@ export default function Workspace() {
             </Link>
           </div>
         )}
-        <main id="main-content" className="app-content">
+        <main id="main-content" tabIndex={-1} className="app-content">
           <ErrorBox error={error} />
           {view === "overview" ? (
-            <Overview me={me} />
+            <>
+              <Overview me={me} />
+              <OverviewRelease me={me} />
+            </>
           ) : view === "new" ? (
             <Intake />
           ) : view === "cases" && id ? (
@@ -212,9 +273,15 @@ export default function Workspace() {
           ) : view === "history" ? (
             <HistoryList />
           ) : view === "knowledge" ? (
-            <Knowledge me={me} />
+            <>
+              <Knowledge me={me} />
+              <KnowledgeRelease me={me} />
+            </>
           ) : view === "operations" ? (
-            <Operations me={me} />
+            <>
+              <Operations me={me} />
+              <RecordsRelease me={me} />
+            </>
           ) : view === "roi" ? (
             <ROI me={me} />
           ) : view === "feedback" ? (
@@ -228,8 +295,7 @@ export default function Workspace() {
           )}
         </main>
         <footer className="app-footer">
-          TrialOps 1.4.1 · Evidence first. Human reviewed.{" "}
-          <Link href="/guide">Guide & data policy</Link>
+          TrialOps · <Link href="/guide">Guide & data policy</Link>
         </footer>
       </div>
     </div>
@@ -243,14 +309,15 @@ function Overview({ me }: { me: Row }) {
       .then(setData)
       .catch((e) => setError(e.message));
   }, []);
-  const [queue, setQueue] = useState("reviews"), [preview, setPreview] = useState("");
+  const [queue, setQueue] = useState("reviews"),
+    [preview, setPreview] = useState("");
   const group = data?.attention?.[queue];
   return (
     <>
       <Heading
         label="OPERATIONS OVERVIEW"
         title="Workspace overview"
-        description={`Welcome, ${me.name}. Start with an issue, and keep the evidence close.`}
+        description={`Welcome, ${me.name}. Review what needs attention.`}
       >
         <Link className="button" href="/workspace/new">
           <Icon name="plus" size={17} />
@@ -259,24 +326,151 @@ function Overview({ me }: { me: Row }) {
       </Heading>
       <ErrorBox error={error} />
       <div className="overview-metrics">
-        {[["Open cases",data?.open_cases],["Awaiting review",data?.attention?.reviews?.total],["Overdue",data?.attention?.overdue?.total]].map(([label,value])=><div key={label as string}><span>{label}</span><strong>{value??"—"}</strong></div>)}
+        {[
+          ["Open cases", data?.open_cases],
+          ["Awaiting review", data?.attention?.reviews?.total],
+          ["Overdue", data?.attention?.overdue?.total],
+        ].map(([label, value]) => (
+          <div key={label as string}>
+            <span>{label}</span>
+            <strong>{value ?? "—"}</strong>
+          </div>
+        ))}
       </div>
       <section className="panel attention-section" aria-label="Attention queue">
-        <div className="section-heading"><h2>Needs your attention</h2><Link className="text-link" href={"/workspace/cases?view="+(queue==="reviews"?"review":queue)}>View all →</Link></div>
-        <div className="tabs" aria-label="Attention categories">{[["reviews","Review"],["unassigned","High priority · unassigned"],["overdue","Overdue"]].map(([key,label])=><button key={key} className={queue===key?"active":""} aria-pressed={queue===key} onClick={()=>setQueue(key)}>{label} · {data?.attention?.[key]?.total??"—"}</button>)}</div>
-        {!group?<p role="status">Loading attention queue…</p>:!group.items.length?<p className="queue-empty"><Icon name="check" size={18}/>Nothing waiting here.</p>:group.items.map((item:Row)=><div className="work-row" key={item.id}><div><strong>{item.title}</strong><small>{item.case_id||item.id}{item.due_at?" · Due "+stamp(item.due_at):""}</small></div><Link className={queue==="reviews"?"button":"button outline"} href={queue==="reviews"?"/workspace/runs/"+item.id:"/workspace/cases/"+item.id}>{queue==="reviews"?"Review findings":"Open case"}</Link></div>)}
-        {group?.total>5&&<small>Showing the first 5 of {group.total}. Open the full view for all results.</small>}
+        <div className="section-heading">
+          <h2>Needs your attention</h2>
+          <Link
+            className="text-link"
+            href={
+              "/workspace/cases?view=" +
+              (queue === "reviews" ? "review" : queue)
+            }
+          >
+            View all →
+          </Link>
+        </div>
+        <div className="tabs" aria-label="Attention categories">
+          {[
+            ["reviews", "Review"],
+            ["unassigned", "High priority · unassigned"],
+            ["overdue", "Overdue"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              className={queue === key ? "active" : ""}
+              aria-pressed={queue === key}
+              onClick={() => setQueue(key)}
+            >
+              {label} · {data?.attention?.[key]?.total ?? "—"}
+            </button>
+          ))}
+        </div>
+        {!group ? (
+          <p role="status">Loading attention queue…</p>
+        ) : !group.items.length ? (
+          <p className="queue-empty">
+            <Icon name="check" size={18} />
+            Nothing waiting here.
+          </p>
+        ) : (
+          group.items.map((item: Row) => (
+            <div className="work-row" key={item.id}>
+              <div>
+                <strong>{item.title}</strong>
+                <small>
+                  {item.case_id || item.id}
+                  {item.due_at ? " · Due " + stamp(item.due_at) : ""}
+                </small>
+              </div>
+              <Link
+                className={queue === "reviews" ? "button" : "button outline"}
+                href={
+                  queue === "reviews"
+                    ? "/workspace/runs/" + item.id
+                    : "/workspace/cases/" + item.id
+                }
+              >
+                {queue === "reviews" ? "Review findings" : "Open case"}
+              </Link>
+            </div>
+          ))
+        )}
+        {group?.total > 5 && (
+          <small>
+            Showing the first 5 of {group.total}. Open the full view for all
+            results.
+          </small>
+        )}
       </section>
-      <section className="panel"><div className="section-heading"><h2>Recently updated</h2><Link className="text-link" href="/workspace/cases">All cases →</Link></div>
-        {!data?<p role="status">Loading recent cases…</p>:!data.recent_cases?.length?<p>No cases yet. Submit an issue to get started.</p>:data.recent_cases.map((c:Row)=><div className="work-row" key={c.id}><div><Link className="case-title" href={"/workspace/cases/"+c.id}><strong>{c.title}</strong></Link><small>{c.id} · {c.status} · {c.priority} priority</small></div><button className="outline" aria-label={"Preview "+c.id} onClick={()=>setPreview(c.id)}>Preview</button></div>)}
+      <section className="panel">
+        <div className="section-heading">
+          <h2>Recently updated</h2>
+          <Link className="text-link" href="/workspace/cases">
+            All cases →
+          </Link>
+        </div>
+        {!data ? (
+          <p role="status">Loading recent cases…</p>
+        ) : !data.recent_cases?.length ? (
+          <p>No cases yet. Submit an issue to get started.</p>
+        ) : (
+          data.recent_cases.map((c: Row) => (
+            <div className="work-row" key={c.id}>
+              <div>
+                <Link className="case-title" href={"/workspace/cases/" + c.id}>
+                  <strong>{c.title}</strong>
+                </Link>
+                <div className="case-row-meta">
+                  <span className="case-id-chip">{c.id}</span>
+                  <small>
+                    {c.status} · {c.priority} priority
+                  </small>
+                </div>
+              </div>
+              <button
+                className="outline"
+                aria-label={"Preview " + c.id}
+                onClick={() => setPreview(c.id)}
+              >
+                Preview
+              </button>
+            </div>
+          ))
+        )}
       </section>
-      {me.demo&&<details className="sample-scenarios"><summary>Explore sample scenarios</summary><div className="sample-links">{[["CASE-1","Missing certificate"],["CASE-4","Stalled synchronization"],["CASE-6","Healthy status check"],["CASE-7","Unsupported request"]].map(([id,label])=><Link key={id} href={"/workspace/cases/"+id}>{label} →</Link>)}</div></details>}
-      {preview&&<CasePreview caseId={preview} onClose={()=>setPreview("")}/>}
-      <div className="getting-started"><Icon name="file" size={20}/><span>Need a walkthrough? The guide explains each step.</span><Link className="text-link" href="/guide">Open guide →</Link></div>
+      {me.demo && (
+        <details className="sample-scenarios">
+          <summary>Explore sample scenarios</summary>
+          <div className="sample-links">
+            {[
+              ["CASE-1", "Missing certificate"],
+              ["CASE-4", "Stalled synchronization"],
+              ["CASE-6", "Healthy status check"],
+              ["CASE-7", "Unsupported request"],
+            ].map(([id, label]) => (
+              <Link key={id} href={"/workspace/cases/" + id}>
+                {label} →
+              </Link>
+            ))}
+          </div>
+        </details>
+      )}
+      {preview && (
+        <CasePreview caseId={preview} onClose={() => setPreview("")} />
+      )}
+      <div className="getting-started">
+        <Icon name="file" size={20} />
+        <span>Need a walkthrough? The guide explains each step.</span>
+        <Link className="text-link" href="/guide">
+          Open guide →
+        </Link>
+      </div>
     </>
   );
 }
 function Intake() {
+  const submission = useRef<string | null>(null);
   const router = useRouter(),
     [catalog, setCatalog] = useState<Row>({ studies: [], sites: [] }),
     [title, setTitle] = useState(""),
@@ -309,7 +503,9 @@ function Intake() {
     setBusy(true);
     setError("");
     try {
+      if (!submission.current) submission.current = crypto.randomUUID();
       const c = await api("/cases", {
+        submission_id: submission.current,
         title,
         description,
         study_id: study,
@@ -330,9 +526,10 @@ function Intake() {
         title="Submit an issue"
         description="Tell us what happened."
       />
-      <div className="editor-layout">
+      <div className="editor-layout intake-layout">
         <form className="panel form-panel" onSubmit={submit}>
           <ErrorBox error={error} />
+          <p className="subtle">Use non-patient operational details.</p>
           <h2>
             <span className="step-num">01</span>What happened?
           </h2>
@@ -458,19 +655,12 @@ function Intake() {
             {busy ? "Saving…" : "Create case"} <Icon name="arrow" size={17} />
           </button>
         </form>
-        <aside className="guide-card">
-          <h3>Your progress</h3>
-          <ol className="intake-steps"><li><strong>Describe</strong><p>What is missing or blocked?</p></li><li><strong>Choose study & site</strong><p>Connect the issue to the right context.</p></li><li><strong>Review & submit</strong><p>You choose the final classification.</p></li></ol>
-          <p className="subtle">Use non-patient sample details.</p>
-          <Link href="/guide" className="text-link">
-            Read the guide →
-          </Link>
-        </aside>
       </div>
     </>
   );
 }
 function CaseDetail({ id, me }: { id: string; me: Row }) {
+  const [workflowRefresh, setWorkflowRefresh] = useState(0);
   const [data, setData] = useState<Row | null>(null),
     [members, setMembers] = useState<Row[]>([]),
     [runId, setRunId] = useState(""),
@@ -478,8 +668,6 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
     [error, setError] = useState(""),
     [note, setNote] = useState(""),
     [resolution, setResolution] = useState(""),
-    [confirmed, setConfirmed] = useState(false),
-    [approved, setApproved] = useState(""),
     [owner, setOwner] = useState(""),
     [due, setDue] = useState(""),
     [message, setMessage] = useState("");
@@ -487,10 +675,6 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
     const d = await api("/cases/" + encodeURIComponent(id));
     setData(d);
     setRunId((current) => current || d.runs[0]?.id || "");
-    setApproved(
-      (current) =>
-        current || d.runs.find((r: Row) => r.decision === "approved")?.id || "",
-    );
     return d;
   }, [id]);
   useEffect(() => {
@@ -501,9 +685,6 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
         setData(d);
         setMembers(m);
         setRunId(d.runs[0]?.id || "");
-        setApproved(
-          d.runs.find((r: Row) => r.decision === "approved")?.id || "",
-        );
         setOwner(d.case.owner_id || "");
         if (d.case.due_at) {
           const dt = new Date(d.case.due_at);
@@ -554,7 +735,6 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
       setMessage(success);
       setNote("");
       setResolution("");
-      setConfirmed(false);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -625,7 +805,9 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
               : "Run investigation"}
         </button>
       </div>
-      {running && <JobProgress status={data.job.status} createdAt={data.job.created_at} />}
+      {running && (
+        <JobProgress status={data.job.status} createdAt={data.job.created_at} />
+      )}
       {data.job?.status === "failed" && (
         <p className="error" role="alert">
           {data.job.error} Use Run investigation to retry.
@@ -658,13 +840,24 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
               </Empty>
             </div>
           )}
+          <CaseWorkflows
+            item={c}
+            runId={runId}
+            me={me}
+            refreshKey={workflowRefresh}
+            onChanged={() => {
+              setWorkflowRefresh((n) => n + 1);
+              void load();
+            }}
+          />
           <section className="panel resolution-panel">
             <div className="section-heading">
               <h2>Case status</h2>
               <Badge value={c.status} />
             </div>
             <p>
-              Close the case only after completing current checks. Approval alone does not resolve it.
+              Close the case only after completing current checks. Approval
+              alone does not resolve it.
             </p>
             {c.resolution && (
               <div className="notice">
@@ -682,40 +875,30 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
                 Approve a supported investigation for this case before recording
                 resolution.
               </p>
+            ) : c.status === "open" ? (
+              <EvidenceResolution
+                cid={id}
+                updatedAt={c.updated_at}
+                runs={approvedRuns}
+                refreshKey={workflowRefresh}
+                onResolved={() => {
+                  void load();
+                  setMessage("Case marked resolved.");
+                }}
+              />
             ) : (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   void action(
-                    c.status === "open" ? "/resolve" : "/reopen",
-                    c.status === "open"
-                      ? { run_id: approved, notes: resolution, confirmed }
-                      : { notes: resolution },
-                    c.status === "open"
-                      ? "Case marked resolved."
-                      : "Case reopened; the original resolution remains in activity.",
+                    "/reopen",
+                    { notes: resolution },
+                    "Case reopened; the original resolution remains in activity.",
                   );
                 }}
               >
-                {c.status === "open" && (
-                  <label>
-                    Approved investigation
-                    <select
-                      value={approved}
-                      onChange={(e) => setApproved(e.target.value)}
-                    >
-                      {approvedRuns.map((r: Row) => (
-                        <option key={r.id} value={r.id}>
-                          {r.id.slice(0, 8)} · {stamp(r.created_at)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
                 <label>
-                  {c.status === "open"
-                    ? "Resolution note"
-                    : "Reason for reopening"}
+                  Reason for reopening
                   <textarea
                     value={resolution}
                     onChange={(e) => setResolution(e.target.value)}
@@ -725,29 +908,10 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
                     required
                   />
                 </label>
-                {c.status === "open" && (
-                  <label className="check-row">
-                    <input
-                      type="checkbox"
-                      checked={confirmed}
-                      onChange={(e) => setConfirmed(e.target.checked)}
-                    />
-                    <span>
-                      I verified current status and completed the necessary
-                      checks. Historical snapshots alone do not confirm
-                      resolution.
-                    </span>
-                  </label>
-                )}
                 <button
-                  disabled={
-                    busy ||
-                    running ||
-                    resolution.trim().length < 10 ||
-                    (c.status === "open" && (!confirmed || !approved))
-                  }
+                  disabled={busy || running || resolution.trim().length < 10}
                 >
-                  {c.status === "open" ? "Mark case resolved" : "Reopen case"}
+                  Reopen case
                 </button>
               </form>
             )}
@@ -762,6 +926,7 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
                 void action(
                   "/assignment",
                   {
+                    expected_updated_at: c.updated_at,
                     owner_id: owner || null,
                     due_at: due ? new Date(due).toISOString() : null,
                   },
@@ -892,10 +1057,19 @@ function RunView({
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/runs/" + id + "/report.pdf", { cache: "no-store" });
-      if (!response.ok || !response.headers.get("content-type")?.includes("application/pdf")) {
+      const response = await fetch("/api/runs/" + id + "/report.pdf", {
+        cache: "no-store",
+      });
+      if (
+        !response.ok ||
+        !response.headers.get("content-type")?.includes("application/pdf")
+      ) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(typeof data.detail === "string" ? data.detail : "PDF download failed. Please try again.");
+        throw new Error(
+          typeof data.detail === "string"
+            ? data.detail
+            : "PDF download failed. Please try again.",
+        );
       }
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
@@ -921,130 +1095,403 @@ function RunView({
       );
     }
   }
-  if (!run) return <div className="panel"><ErrorBox error={error} /><p role="status">Loading investigation…</p></div>;
-  const r = run.result, rec = r.recommendation,
+  if (!run)
+    return (
+      <div className="panel">
+        <ErrorBox error={error} />
+        <p role="status">Loading investigation…</p>
+      </div>
+    );
+  const r = run.result,
+    rec = r.recommendation,
     canReview = ["owner", "reviewer"].includes(me.role),
     cited = r.sources.filter((s: Row) => rec.evidence_ids.includes(s.id)),
-    tabs = [["overview", "Overview"], ["evidence", "Evidence"], ["records", "Records"], ["activity", "Activity"]];
+    tabs = [
+      ["overview", "Overview"],
+      ["evidence", "Evidence"],
+      ["records", "Records"],
+      ["activity", "Activity"],
+    ];
   return (
-    <section className={"panel run-panel " + (!embedded ? "standalone-run" : "")}>
+    <section
+      className={"panel run-panel " + (!embedded ? "standalone-run" : "")}
+    >
       <div className="section-heading">
-        <div><p className="eyebrow">SAVED INVESTIGATION</p><h2>Investigation findings</h2></div>
+        <div>
+          <p className="eyebrow">SAVED INVESTIGATION</p>
+          <h2>Investigation findings</h2>
+        </div>
         <Badge value={run.decision || "pending"} />
       </div>
       <div className="run-toolbar">
-        <span className="subtle">{stamp(run.created_at)} · {run.duration_seconds.toFixed(1)}s</span>
+        <span className="subtle">
+          {stamp(run.created_at)} · {run.duration_seconds.toFixed(1)}s
+        </span>
         <div className="actions">
-          <button className="outline" onClick={() => download("trialops-investigation-" + run.id.slice(0,8) + ".json",run)}>Export JSON</button>
-          <button disabled={busy} onClick={downloadPdf}><Icon name="file" size={16} />Download PDF report</button>
+          <button
+            className="outline"
+            onClick={() =>
+              download(
+                "trialops-investigation-" + run.id.slice(0, 8) + ".json",
+                run,
+              )
+            }
+          >
+            Export JSON
+          </button>
+          <button
+            className="outline"
+            disabled={busy}
+            aria-busy={busy}
+            onClick={downloadPdf}
+          >
+            <Icon name="file" size={16} />
+            Download PDF report
+          </button>
         </div>
       </div>
-      {!embedded && <Link href={"/workspace/cases/" + run.case_id} className="text-link">Open case {run.case_id} →</Link>}
-      <ErrorBox error={error} />
-      <div className="investigation-tabs" role="tablist" aria-label="Investigation sections">
-        {tabs.map(([key,label],i) => <button key={key} type="button" role="tab" id={run.id+"-tab-"+key} aria-controls={run.id+"-panel-"+key} aria-selected={tab===key} tabIndex={tab===key?0:-1} onClick={()=>setTab(key)} onKeyDown={e=>{
-          let next=i;
-          if(e.key==="ArrowRight")next=(i+1)%tabs.length;
-          else if(e.key==="ArrowLeft")next=(i+tabs.length-1)%tabs.length;
-          else if(e.key==="Home")next=0;
-          else if(e.key==="End")next=tabs.length-1;
-          else return;
-          e.preventDefault();setTab(tabs[next][0]);(e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next])?.focus();
-        }}>{label}</button>)}
-      </div>
-      <div role="tabpanel" id={run.id+"-panel-"+tab} aria-labelledby={run.id+"-tab-"+tab} className="investigation-content" key={tab}>
-      {tab==="overview" && <>
-        {rec.status === "insufficient_evidence" ? <div className="notice"><strong>No relevant procedure found</strong><p>Insufficient relevant evidence. Approval is unavailable.</p><p>Add a relevant procedure in Knowledge or ask a reviewer for more details.</p></div> : <>
-          <div className="section-heading"><h3>What was found</h3><Badge value="supported" /></div>
-          {(r.operational_findings?.length||0)>0?<p>{r.operational_findings.slice(0,3).map((f:Row)=>f.facts[0]).join(" ")}</p>:<p>{cited.length} relevant {cited.length===1?"procedure was":"procedures were"} found. No matching issue-specific observations are available.</p>}
-          <p className="scope-note"><Icon name="shield" size={16}/>Historical site-level context. Current status, exact case linkage, and cause remain unconfirmed.</p>
-          <div className="section-heading"><h3>Checks to perform</h3><span className="subtle">Open to read the full procedure</span></div>
-          {cited.map((source:Row)=><details className="source cited-check" key={source.id} open={cited.length===1}>
-            <summary><span>{source.title}</span><Icon name="arrow" size={16}/></summary>
-            <p className="preserve">{source.content}</p><small>Source: {source.id}</small>
-          </details>)}
-        </>}
-        {(r.operational_findings?.length||0)>0&&<button className="text-button" onClick={()=>setTab("records")}>Inspect historical records and timestamps →</button>}
-        <div className="section-heading"><h3>Escalation drafts</h3><span className="subtle">Unsent</span></div>
-        {r.escalation_drafts.length ? r.escalation_drafts.map((d:Row)=><article className="compact-draft" key={d.id}>
-          <details><summary>{d.knowledge_ids?.includes("KB-001")?"Document processing escalation":"Synchronization escalation"}</summary><p className="subtle">{d.subject}</p><pre>{d.body}</pre></details>
-          <button className="outline" onClick={()=>copy(d)}>{copied===d.id?"Copied draft":"Copy draft"}</button>
-        </article>) : <p className="subtle">No recorded condition triggered a draft.</p>}
-        <p className="subtle">Copying or approving does not send a draft.</p>
-      {!run.decision ? (
-        canReview ? (
-          <form className="review-form" onSubmit={(e) => e.preventDefault()}>
-            <h3>Review the proposed checks</h3><p className="subtle">Approval reviews these checks. It does not resolve the case or send a draft.</p>
-            <label>
-              Review notes
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                minLength={5}
-                maxLength={2000}
-                rows={3}
-                placeholder="Add your reason for approving or rejecting these checks."
-              />
-            </label>
-            <div className="actions">
-              <button
-                disabled={
-                  busy || notes.trim().length < 5 || rec.status !== "supported"
-                }
-                onClick={() => decide("approved")}
-              >
-                Approve recommendation
-              </button>
-              <button
-                className="outline"
-                disabled={busy || notes.trim().length < 5}
-                onClick={() => decide("rejected")}
-              >
-                Reject
-              </button>
-            </div>
-          </form>
-        ) : (
-          <p className="notice">
-            A reviewer or owner must record this decision.
-          </p>
-        )
-      ) : (
-        <div className="notice">
-          <strong>
-            {run.decision} by {run.reviewer || "Former member"}
-          </strong>
-          <p>{run.review_notes}</p>
-          <small>{run.reviewed_at && stamp(run.reviewed_at)}</small>
-        </div>
+      {!embedded && (
+        <Link href={"/workspace/cases/" + run.case_id} className="text-link">
+          Open case {run.case_id} →
+        </Link>
       )}
-
-      </>}
-      {tab==="evidence" && <>
-        <h3>Saved summary</h3><p>{rec.summary}</p>
-        <details className="source"><summary>Why the cause is unconfirmed</summary><p>{rec.hypothesis}</p></details>
-        <h3>Retrieved procedures</h3><p className="subtle">Cited procedures support these checks. Candidates were retrieved but not selected.</p>
-        {r.sources.map((source:Row)=><details className="source" key={source.id}><summary><span>{source.title}</span><Badge value={rec.evidence_ids.includes(source.id)?"cited":"candidate"}/></summary><p className="preserve">{source.content}</p><p className="subtle">{source.id} · {source.retrieval_method} · score {source.similarity}. A score does not establish relevance.</p></details>)}
-        <details className="source"><summary>Complete documented next steps</summary><p className="preserve">{rec.recommended_next_step}</p></details>
-      </>}
-      {tab==="records" && <>
-        <h3>Historical site records</h3><p className="scope-note">Saved with this investigation. They do not prove the current status or cause of this case.</p>
-        <div className="snapshot-grid">{Object.entries(r.operational_evidence||{}).map(([kind,value])=>{const g=value as Row;return <article className="snapshot" key={kind}><h4>{kind==="synchronization"?"Synchronization jobs":"Document processing"}</h4>{g.snapshot?<>
-          <div className="record-context"><strong>{g.snapshot.study_id}</strong><strong>{g.snapshot.site_id}</strong></div>
-          <p>Observed {stamp(g.snapshot.observed_at)}</p><p>{g.records.length} {g.records.length===1?"record":"records"}</p>
-          <details><summary>View saved record fields</summary>{g.records.map((record:Row)=><dl className="record-fields" key={record.id}>{Object.entries(record).map(([key,val])=><div key={key}><dt>{key.replaceAll("_"," ")}</dt><dd>{typeof val==="boolean"?(val?"Yes":"No"):String(val??"Not recorded")}</dd></div>)}</dl>)}</details>
-          <details className="technical"><summary>Technical JSON</summary><pre>{JSON.stringify(g,null,2)}</pre></details>
-        </>:<p>No snapshot available for this study and site.</p>}</article>})}</div>
-        {(r.operational_findings||[]).map((f:Row)=><details className="source" key={f.record_id}><summary><span>{f.record_id}</span><span>{f.knowledge_ids.join(", ")}</span></summary><ul>{f.facts.map((fact:string)=><li key={fact}>{fact}</li>)}</ul><p className="subtle">{f.scope}</p></details>)}
-      </>}
-      {tab==="activity" && <>
-        <h3>Investigation activity</h3>
-        {(run.events||[]).map((event:Row)=><article className="activity-row" key={event.id}><strong>{event.event_type.replaceAll("_"," ")}</strong><p>{stamp(event.created_at)} · {event.actor_name||"System"}</p>{event.notes&&<p>{event.notes}</p>}</article>)}
-        <details className="source"><summary>Tool trace · {r.tool_calls.length} calls</summary>{r.tool_calls.map((t:Row,i:number)=><div className="trace" key={i}><b>{t.tool}</b><span>{t.status} · {t.duration_seconds}s</span></div>)}</details>
-        <p className="subtle">{r.mode_label} · Run {run.id}</p>
-      </>}
+      <ErrorBox error={error} />
+      <div
+        className="investigation-tabs"
+        role="tablist"
+        aria-label="Investigation sections"
+      >
+        {tabs.map(([key, label], i) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            id={run.id + "-tab-" + key}
+            aria-controls={run.id + "-panel-" + key}
+            aria-selected={tab === key}
+            tabIndex={tab === key ? 0 : -1}
+            onClick={() => setTab(key)}
+            onKeyDown={(e) => {
+              let next = i;
+              if (e.key === "ArrowRight") next = (i + 1) % tabs.length;
+              else if (e.key === "ArrowLeft")
+                next = (i + tabs.length - 1) % tabs.length;
+              else if (e.key === "Home") next = 0;
+              else if (e.key === "End") next = tabs.length - 1;
+              else return;
+              e.preventDefault();
+              setTab(tabs[next][0]);
+              e.currentTarget.parentElement
+                ?.querySelectorAll<HTMLButtonElement>("button")
+                [next]?.focus();
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      {embedded && <Link className="text-link" href={"/workspace/runs/"+run.id}>Open saved investigation →</Link>}
+      <div
+        role="tabpanel"
+        id={run.id + "-panel-" + tab}
+        aria-labelledby={run.id + "-tab-" + tab}
+        className="investigation-content"
+        key={tab}
+      >
+        {tab === "overview" && (
+          <>
+            {rec.status === "insufficient_evidence" ? (
+              <div className="notice">
+                <strong>No relevant procedure found</strong>
+                <p>Insufficient relevant evidence. Approval is unavailable.</p>
+                <p>
+                  Add a relevant procedure in Knowledge or ask a reviewer for
+                  more details.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="section-heading">
+                  <h3>What was found</h3>
+                  <Badge value="supported" />
+                </div>
+                {(r.operational_findings?.length || 0) > 0 ? (
+                  <p>
+                    {r.operational_findings
+                      .slice(0, 3)
+                      .map((f: Row) => f.facts[0])
+                      .join(" ")}
+                  </p>
+                ) : (
+                  <p>
+                    {cited.length} relevant{" "}
+                    {cited.length === 1 ? "procedure was" : "procedures were"}{" "}
+                    found. No matching issue-specific observations are
+                    available.
+                  </p>
+                )}
+                <p className="scope-note">
+                  <Icon name="shield" size={16} />
+                  Historical site-level context. Current status, exact case
+                  linkage, and cause remain unconfirmed.
+                </p>
+                <div className="section-heading">
+                  <h3>Checks to perform</h3>
+                  <span className="subtle">
+                    Open to read the full procedure
+                  </span>
+                </div>
+                {cited.map((source: Row) => (
+                  <details className="source cited-check" key={source.id}>
+                    <summary>
+                      <span>{source.title}</span>
+                    </summary>
+                    <p className="preserve">{source.content}</p>
+                    <small>Source: {source.id}</small>
+                  </details>
+                ))}
+              </>
+            )}
+            {(r.operational_findings?.length || 0) > 0 && (
+              <button className="text-button" onClick={() => setTab("records")}>
+                Inspect historical records and timestamps →
+              </button>
+            )}
+            <div className="section-heading">
+              <h3>Escalation drafts</h3>
+              <span className="subtle">Unsent</span>
+            </div>
+            {r.escalation_drafts.length ? (
+              r.escalation_drafts.map((d: Row) => (
+                <article className="compact-draft" key={d.id}>
+                  <details>
+                    <summary>
+                      {d.knowledge_ids?.includes("KB-001")
+                        ? "Document processing escalation"
+                        : "Synchronization escalation"}
+                    </summary>
+                    <p className="subtle">{d.subject}</p>
+                    <pre>{d.body}</pre>
+                  </details>
+                  <button className="outline" onClick={() => copy(d)}>
+                    {copied === d.id ? "Copied draft" : "Copy draft"}
+                  </button>
+                </article>
+              ))
+            ) : (
+              <p className="subtle">No recorded condition triggered a draft.</p>
+            )}
+            <p className="subtle">Copying a draft does not send it.</p>
+            {!run.decision ? (
+              canReview ? (
+                <form
+                  className="review-form"
+                  onSubmit={(e) => e.preventDefault()}
+                >
+                  <h3>Review the proposed checks</h3>
+                  <p className="subtle">
+                    Approval reviews these checks. It does not resolve the case
+                    or send a draft.
+                  </p>
+                  <label>
+                    Review notes
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      minLength={5}
+                      maxLength={2000}
+                      rows={3}
+                      placeholder="Add your reason for approving or rejecting these checks."
+                    />
+                  </label>
+                  <div className="actions">
+                    <button
+                      disabled={
+                        busy ||
+                        notes.trim().length < 5 ||
+                        rec.status !== "supported"
+                      }
+                      onClick={() => decide("approved")}
+                    >
+                      Approve recommendation
+                    </button>
+                    <button
+                      className="outline"
+                      disabled={busy || notes.trim().length < 5}
+                      onClick={() => decide("rejected")}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <p className="notice">
+                  A reviewer or owner must record this decision.
+                </p>
+              )
+            ) : (
+              <div className="notice">
+                <strong>
+                  {run.decision} by {run.reviewer || "Former member"}
+                </strong>
+                <p>{run.review_notes}</p>
+                <small>{run.reviewed_at && stamp(run.reviewed_at)}</small>
+              </div>
+            )}
+          </>
+        )}
+        {tab === "evidence" && (
+          <>
+            <h3>Saved summary</h3>
+            <p>{rec.summary}</p>
+            <details className="source">
+              <summary>Why the cause is unconfirmed</summary>
+              <p>{rec.hypothesis}</p>
+            </details>
+            <h3>Retrieved procedures</h3>
+            <p className="subtle">
+              Cited procedures support these checks. Candidates were retrieved
+              but not selected.
+            </p>
+            {r.sources.map((source: Row) => (
+              <details className="source" key={source.id}>
+                <summary>
+                  <span>{source.title}</span>
+                  <Badge
+                    value={
+                      rec.evidence_ids.includes(source.id)
+                        ? "cited"
+                        : "candidate"
+                    }
+                  />
+                </summary>
+                <p className="preserve">{source.content}</p>
+                <p className="subtle">
+                  {source.id} · {source.retrieval_method} · score{" "}
+                  {source.similarity}. A score does not establish relevance.
+                </p>
+              </details>
+            ))}
+            <details className="source">
+              <summary>Complete documented next steps</summary>
+              <p className="preserve">{rec.recommended_next_step}</p>
+            </details>
+          </>
+        )}
+        {tab === "records" && (
+          <>
+            <h3>Historical site records</h3>
+            <p className="scope-note">
+              Saved with this investigation. They do not prove the current
+              status or cause of this case.
+            </p>
+            <div className="snapshot-grid">
+              {Object.entries(r.operational_evidence || {}).map(
+                ([kind, value]) => {
+                  const g = value as Row;
+                  return (
+                    <article className="snapshot" key={kind}>
+                      <h4>
+                        {kind === "synchronization"
+                          ? "Synchronization jobs"
+                          : "Document processing"}
+                      </h4>
+                      {g.snapshot ? (
+                        <>
+                          <div className="record-context">
+                            <strong>{g.snapshot.study_id}</strong>
+                            <strong>{g.snapshot.site_id}</strong>
+                          </div>
+                          <p>Observed {stamp(g.snapshot.observed_at)}</p>
+                          <p>
+                            {g.records.length}{" "}
+                            {g.records.length === 1 ? "record" : "records"}
+                          </p>
+                          <details>
+                            <summary>View saved record fields</summary>
+                            {g.records.map((record: Row) => (
+                              <dl className="record-fields" key={record.id}>
+                                {Object.entries(record).map(([key, val]) => (
+                                  <div key={key}>
+                                    <dt>{key.replaceAll("_", " ")}</dt>
+                                    <dd>
+                                      {typeof val === "boolean"
+                                        ? val
+                                          ? "Yes"
+                                          : "No"
+                                        : String(val ?? "Not recorded")}
+                                    </dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            ))}
+                          </details>
+                          <details className="technical">
+                            <summary>Technical JSON</summary>
+                            <pre>{JSON.stringify(g, null, 2)}</pre>
+                          </details>
+                        </>
+                      ) : (
+                        <p>No snapshot available for this study and site.</p>
+                      )}
+                    </article>
+                  );
+                },
+              )}
+            </div>
+            {(r.operational_findings || []).map((f: Row) => (
+              <details className="source" key={f.record_id}>
+                <summary>
+                  <span>{f.record_id}</span>
+                  <span>{f.knowledge_ids.join(", ")}</span>
+                </summary>
+                <ul>
+                  {f.facts.map((fact: string) => (
+                    <li key={fact}>{fact}</li>
+                  ))}
+                </ul>
+                <p className="subtle">{f.scope}</p>
+              </details>
+            ))}
+          </>
+        )}
+        {tab === "activity" && (
+          <>
+            <h3>Investigation activity</h3>
+            {(run.events || []).map((event: Row) => (
+              <article className="activity-row" key={event.id}>
+                <strong>{event.event_type.replaceAll("_", " ")}</strong>
+                <p>
+                  {stamp(event.created_at)} · {event.actor_name || "System"}
+                </p>
+                {event.notes && <p>{event.notes}</p>}
+              </article>
+            ))}
+            <details className="source">
+              <summary>Tool trace · {r.tool_calls.length} calls</summary>
+              {r.tool_calls.map((t: Row, i: number) => (
+                <div className="trace" key={i}>
+                  <b>{t.tool}</b>
+                  <span>
+                    {t.status} · {t.duration_seconds}s
+                  </span>
+                </div>
+              ))}
+            </details>
+            <p className="subtle">{r.mode_label}</p>
+            <details className="technical">
+              <summary>Investigation identifiers</summary>
+              <p>
+                Run {run.id} · Case {run.case_id} · Model {run.model}
+              </p>
+            </details>
+          </>
+        )}
+      </div>
+      {embedded && (
+        <Link className="text-link" href={"/workspace/runs/" + run.id}>
+          Open saved investigation →
+        </Link>
+      )}
     </section>
   );
 }
@@ -1054,9 +1501,12 @@ function HistoryList() {
     [q, setQ] = useState(""),
     [decision, setDecision] = useState(""),
     [offset, setOffset] = useState(0),
+    [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError("");
     const t = setTimeout(
       () =>
         api(
@@ -1064,10 +1514,17 @@ function HistoryList() {
             new URLSearchParams({ q, decision, offset: String(offset) }),
         )
           .then((d) => {
-            if (active) setData(d);
+            if (active) {
+              setData(d);
+              setLoading(false);
+            }
           })
           .catch((e) => {
-            if (active) setError(e.message);
+            if (active) {
+              setError(e.message);
+              setData(null);
+              setLoading(false);
+            }
           }),
       180,
     );
@@ -1081,8 +1538,12 @@ function HistoryList() {
       <Heading
         label="INVESTIGATION HISTORY"
         title="Investigations"
-        description="Reopen the exact procedures and records used in a saved investigation."
-      />
+        description="Reopen the procedures and records saved with an investigation."
+      >
+        <Link className="button" href="/workspace/cases">
+          Choose a case to investigate
+        </Link>
+      </Heading>
       <ErrorBox error={error} />
       <div className="list-controls">
         <input
@@ -1108,9 +1569,14 @@ function HistoryList() {
           ))}
         </select>
       </div>
-      <div className="panel list-panel">
-        {!data ? (
-          <p>Loading investigations…</p>
+      <div className="panel list-panel" aria-busy={loading}>
+        {loading ? (
+          <p role="status">Loading investigations…</p>
+        ) : !data ? (
+          <p>
+            Investigations could not be loaded. Refresh or change a filter to
+            retry.
+          </p>
         ) : !data.items.length ? (
           <Empty title="No saved investigations yet.">
             <Link href="/workspace/cases">Choose a case to investigate →</Link>
@@ -1127,9 +1593,6 @@ function HistoryList() {
                   {r.case_id} · {stamp(r.created_at)}
                 </small>
                 <h3>{r.title}</h3>
-                <span className="subtle">
-                  Run {r.id.slice(0, 8)} · {r.model}
-                </span>
               </div>
               <Badge value={r.decision || "pending"} />
             </Link>
@@ -1137,17 +1600,19 @@ function HistoryList() {
         )}
       </div>
       <div className="pagination">
-        <span>{data?.total ?? 0} investigations</span>
+        <span role="status">
+          {loading ? "Updating results…" : `${data?.total ?? 0} investigations`}
+        </span>
         <button
           className="outline"
-          disabled={!offset}
+          disabled={loading || !offset}
           onClick={() => setOffset(offset - 25)}
         >
           Previous
         </button>
         <button
           className="outline"
-          disabled={!data || offset + 25 >= data.total}
+          disabled={loading || !data || offset + 25 >= data.total}
           onClick={() => setOffset(offset + 25)}
         >
           Next
@@ -1167,11 +1632,38 @@ function Knowledge({ me }: { me: Row }) {
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
   const owner = me.role === "owner";
-  const [editorOpen,setEditorOpen]=useState(false),[editing,setEditing]=useState(false),[libraryStatus,setLibraryStatus]=useState("active");
-  const fileInput=useRef<HTMLInputElement>(null), procedureDetail=useRef<HTMLElement>(null);
-  useEffect(()=>{if(!editorOpen)return;const frame=requestAnimationFrame(()=>{procedureDetail.current?.focus({preventScroll:true});procedureDetail.current?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"});});return()=>cancelAnimationFrame(frame);},[editorOpen,selected?.id,editing]);
-  const dirty=editing&&(title!==(selected?.title||"")||content!==(selected?.content||"")||category!==(selected?.category||"unknown"));
-  useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue="";};window.addEventListener("beforeunload",warn);return()=>window.removeEventListener("beforeunload",warn);},[dirty]);
+  const [editorOpen, setEditorOpen] = useState(false),
+    [editing, setEditing] = useState(false),
+    [libraryStatus, setLibraryStatus] = useState("active");
+  const fileInput = useRef<HTMLInputElement>(null),
+    procedureDetail = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!editorOpen) return;
+    const frame = requestAnimationFrame(() => {
+      procedureDetail.current?.focus({ preventScroll: true });
+      procedureDetail.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+        block: "start",
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editorOpen, selected?.id, editing]);
+  const dirty =
+    editing &&
+    (title !== (selected?.title || "") ||
+      content !== (selected?.content || "") ||
+      category !== (selected?.category || "unknown"));
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const load = useCallback(async () => setItems(await api("/knowledge")), []);
   useEffect(() => {
     load().catch((e) => setError(e.message));
@@ -1181,9 +1673,15 @@ function Knowledge({ me }: { me: Row }) {
     const t = setInterval(() => load().catch((e) => setError(e.message)), 3000);
     return () => clearInterval(t);
   }, [items, load]);
-  function choose(a: Row | null, confirmed=false) {
-    if(!confirmed && dirty && !window.confirm("Discard the unsaved procedure changes?"))return false;
-    setEditorOpen(true);setEditing(!a);
+  function choose(a: Row | null, confirmed = false) {
+    if (
+      !confirmed &&
+      dirty &&
+      !window.confirm("Discard the unsaved procedure changes?")
+    )
+      return false;
+    setEditorOpen(true);
+    setEditing(!a);
     setSelected(a);
     setTitle(a?.title || "");
     setContent(a?.content || "");
@@ -1193,7 +1691,8 @@ function Knowledge({ me }: { me: Row }) {
     return true;
   }
   async function upload(file: File) {
-    if(dirty&&!window.confirm("Discard the unsaved procedure changes?"))return;
+    if (dirty && !window.confirm("Discard the unsaved procedure changes?"))
+      return;
     if (file.size > 2 * 1024 * 1024) {
       setError("Upload must be 2 MB or smaller.");
       return;
@@ -1204,7 +1703,7 @@ function Knowledge({ me }: { me: Row }) {
       const form = new FormData();
       form.append("file", file);
       const x = await api("/knowledge/extract", form);
-      choose(null,true);
+      choose(null, true);
       setTitle(x.title);
       setContent(x.content);
       setMessage(
@@ -1268,31 +1767,260 @@ function Knowledge({ me }: { me: Row }) {
       setBusy(false);
     }
   }
-    const visible=items.filter(a=>(libraryStatus==="all"||(libraryStatus==="archived"?a.archived:!a.archived))&&(a.title+" "+a.id).toLowerCase().includes(q.toLowerCase()));
-  function closeEditor(){if(dirty&&!window.confirm("Discard the unsaved procedure changes?"))return;setEditorOpen(false);setEditing(false);setError("");}
-  return <>
-    <Heading label="KNOWLEDGE LIBRARY" title="Knowledge library" description="Manage the procedures used in investigations.">
-      {owner&&<div className="actions"><button className="outline" onClick={()=>choose(null)}>New procedure</button><button onClick={()=>fileInput.current?.click()}>Upload procedure</button></div>}
-    </Heading>
-    {owner&&<><input ref={fileInput} className="hidden-file-input" aria-label="Upload procedure file" type="file" accept=".txt,.md,.pdf" disabled={busy} onChange={e=>{const file=e.target.files?.[0];if(file)void upload(file);e.target.value="";}}/><p className="subtle upload-limits">TXT, Markdown, or text-based PDF · up to 2 MB / 30 pages</p></>}
-    <ErrorBox error={error}/>{message&&<p className="success" role="status">{message}</p>}
-    <div className="case-toolbar"><input aria-label="Search procedures" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search procedures…"/><select aria-label="Procedure status" value={libraryStatus} onChange={e=>setLibraryStatus(e.target.value)}><option value="active">Active</option><option value="archived">Archived</option><option value="all">All procedures</option></select></div>
-    <div className="panel table-panel"><DataTable<Row> label="Knowledge procedures" rows={visible} rowKey={a=>a.id} empty={<div className="empty"><h3>No matching procedures</h3><p>Change the search or status filter{owner?", or add a procedure.":"."}</p></div>} columns={[
-      {label:"Procedure",render:a=><button className="procedure-title" onClick={()=>choose(a)} aria-label={a.title+" v"+a.version}><strong>{a.title}</strong><small>{a.id}</small></button>},
-      {label:"Category",render:a=><span>{categories.find(c=>c[0]===a.category)?.[1]||a.category}</span>},
-      {label:"Version",render:a=><span>v{a.version}</span>},
-      {label:"Status",render:a=><><Badge value={a.archived?"archived":"active"}/><small>{a.indexing_status.replaceAll("_"," ")}{a.indexing_error?" · needs attention":""}</small></>},
-    ]}/></div><p className="subtle">{visible.length} procedures in this view. Earlier investigations keep their saved source version.</p>
-    {editorOpen&&<section ref={procedureDetail} tabIndex={-1} className="panel procedure-detail" aria-label="Procedure details"><div className="section-heading"><h2>{selected?(editing?"Edit procedure":"Review procedure"):"Add a procedure"}</h2><button className="outline" disabled={busy} onClick={closeEditor}>Close procedure</button></div>
-      {!editing&&selected?<><div className="context-line"><span>{selected.id} · v{selected.version}</span><Badge value={selected.archived?"archived":"active"}/></div><h3>{selected.title}</h3><p className="preserve">{selected.content}</p>{selected.indexing_error&&<p className="notice">{selected.indexing_error}</p>}{owner?<div className="actions"><button disabled={busy} onClick={()=>setEditing(true)}>Edit procedure</button><button className="outline" disabled={busy} onClick={archive}>{selected.archived?"Restore procedure":"Archive procedure"}</button></div>:<p className="subtle">Owners maintain procedures. Your role has read access.</p>}</>:<form className="form-panel" onSubmit={save}>
-        <label>Procedure title<input aria-label="Procedure title" value={title} onChange={e=>setTitle(e.target.value)} minLength={5} maxLength={200} required disabled={!owner||busy}/></label>
-        <label>Category<FieldCategory value={category} onChange={setCategory} disabled={!owner||busy}/></label>
-        <label>Procedure text<textarea aria-label="Procedure text" value={content} onChange={e=>setContent(e.target.value)} minLength={30} maxLength={50000} rows={7} required disabled={!owner||busy} placeholder="Paste documented checks and conditions. Do not include patient information."/></label>
-        <small>{content.length.toLocaleString()} / 50,000 characters. Editing creates a new version.</small>
-        {owner&&<div className="actions"><button disabled={busy||title.trim().length<5||content.trim().length<30}>{busy?"Saving…":"Save procedure"}</button>{selected&&<button type="button" className="outline" disabled={busy} onClick={archive}>{selected.archived?"Restore procedure":"Archive procedure"}</button>}</div>}
-      </form>}
-    </section>}
-  </>;
+  const visible = items.filter(
+    (a) =>
+      (libraryStatus === "all" ||
+        (libraryStatus === "archived" ? a.archived : !a.archived)) &&
+      (a.title + " " + a.id).toLowerCase().includes(q.toLowerCase()),
+  );
+  function closeEditor() {
+    if (dirty && !window.confirm("Discard the unsaved procedure changes?"))
+      return;
+    setEditorOpen(false);
+    setEditing(false);
+    setError("");
+  }
+  return (
+    <>
+      <Heading
+        label="KNOWLEDGE LIBRARY"
+        title="Knowledge library"
+        description="Manage the procedures used in investigations."
+      >
+        {owner && (
+          <div className="actions">
+            <button className="outline" onClick={() => choose(null)}>
+              New procedure
+            </button>
+            <button onClick={() => fileInput.current?.click()}>
+              Upload procedure
+            </button>
+          </div>
+        )}
+      </Heading>
+      {owner && (
+        <>
+          <input
+            ref={fileInput}
+            className="hidden-file-input"
+            aria-label="Upload procedure file"
+            type="file"
+            accept=".txt,.md,.pdf"
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload(file);
+              e.target.value = "";
+            }}
+          />
+          <p className="subtle upload-limits">
+            TXT, Markdown, or text-based PDF · up to 2 MB / 30 pages
+          </p>
+        </>
+      )}
+      <ErrorBox error={error} />
+      {message && (
+        <p className="success" role="status">
+          {message}
+        </p>
+      )}
+      <div className="case-toolbar">
+        <input
+          aria-label="Search procedures"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search procedures…"
+        />
+        <select
+          aria-label="Procedure status"
+          value={libraryStatus}
+          onChange={(e) => setLibraryStatus(e.target.value)}
+        >
+          <option value="active">Active</option>
+          <option value="archived">Archived</option>
+          <option value="all">All procedures</option>
+        </select>
+      </div>
+      <div className="panel table-panel">
+        <DataTable<Row>
+          label="Knowledge procedures"
+          rows={visible}
+          rowKey={(a) => a.id}
+          empty={
+            <div className="empty">
+              <h3>No matching procedures</h3>
+              <p>
+                Change the search or status filter
+                {owner ? ", or add a procedure." : "."}
+              </p>
+            </div>
+          }
+          columns={[
+            {
+              label: "Procedure",
+              render: (a) => (
+                <button
+                  className="procedure-title"
+                  onClick={() => choose(a)}
+                  aria-label={a.title + " v" + a.version}
+                >
+                  <strong>{a.title}</strong>
+                  <small>{a.id}</small>
+                </button>
+              ),
+            },
+            {
+              label: "Category",
+              render: (a) => (
+                <span>
+                  {categories.find((c) => c[0] === a.category)?.[1] ||
+                    a.category}
+                </span>
+              ),
+            },
+            { label: "Version", render: (a) => <span>v{a.version}</span> },
+            {
+              label: "Status",
+              render: (a) => (
+                <>
+                  <Badge value={a.archived ? "archived" : "active"} />
+                  <small>
+                    {a.indexing_error
+                      ? "Indexing needs attention"
+                      : a.indexing_status === "queued"
+                        ? "Indexing queued"
+                        : "Search ready"}
+                  </small>
+                </>
+              ),
+            },
+          ]}
+        />
+      </div>
+      <p className="subtle">
+        {visible.length} procedures in this view. Earlier investigations keep
+        their saved source version.
+      </p>
+      {editorOpen && (
+        <section
+          ref={procedureDetail}
+          tabIndex={-1}
+          className="panel procedure-detail"
+          aria-label="Procedure details"
+        >
+          <div className="section-heading">
+            <h2>
+              {selected
+                ? editing
+                  ? "Edit procedure"
+                  : "Review procedure"
+                : "Add a procedure"}
+            </h2>
+            <button className="outline" disabled={busy} onClick={closeEditor}>
+              Close procedure
+            </button>
+          </div>
+          {!editing && selected ? (
+            <>
+              <div className="context-line">
+                <span>
+                  {selected.id} · v{selected.version}
+                </span>
+                <Badge value={selected.archived ? "archived" : "active"} />
+              </div>
+              <h3>{selected.title}</h3>
+              <p className="preserve">{selected.content}</p>
+              {selected.indexing_error && (
+                <p className="notice">{selected.indexing_error}</p>
+              )}
+              {owner ? (
+                <div className="actions">
+                  <button disabled={busy} onClick={() => setEditing(true)}>
+                    Edit procedure
+                  </button>
+                  <button className="outline" disabled={busy} onClick={archive}>
+                    {selected.archived
+                      ? "Restore procedure"
+                      : "Archive procedure"}
+                  </button>
+                </div>
+              ) : (
+                <p className="subtle">
+                  Owners maintain procedures. Your role has read access.
+                </p>
+              )}
+            </>
+          ) : (
+            <form className="form-panel" onSubmit={save}>
+              <label>
+                Procedure title
+                <input
+                  aria-label="Procedure title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  minLength={5}
+                  maxLength={200}
+                  required
+                  disabled={!owner || busy}
+                />
+              </label>
+              <label>
+                Category
+                <FieldCategory
+                  value={category}
+                  onChange={setCategory}
+                  disabled={!owner || busy}
+                />
+              </label>
+              <label>
+                Procedure text
+                <textarea
+                  aria-label="Procedure text"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  minLength={30}
+                  maxLength={50000}
+                  rows={7}
+                  required
+                  disabled={!owner || busy}
+                  placeholder="Paste documented checks and conditions. Do not include patient information."
+                />
+              </label>
+              <small>
+                {content.length.toLocaleString()} / 50,000 characters. Editing
+                creates a new version.
+              </small>
+              {owner && (
+                <div className="actions">
+                  <button
+                    disabled={
+                      busy ||
+                      title.trim().length < 5 ||
+                      content.trim().length < 30
+                    }
+                  >
+                    {busy ? "Saving…" : "Save procedure"}
+                  </button>
+                  {selected && (
+                    <button
+                      type="button"
+                      className="outline"
+                      disabled={busy}
+                      onClick={archive}
+                    >
+                      {selected.archived
+                        ? "Restore procedure"
+                        : "Archive procedure"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </form>
+          )}
+        </section>
+      )}
+    </>
+  );
 }
 function Operations({ me }: { me: Row }) {
   const [items, setItems] = useState<Row[]>([]),
@@ -1300,6 +2028,8 @@ function Operations({ me }: { me: Row }) {
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
+  const snapshotFile = useRef<HTMLInputElement>(null);
+  const [snapshotFileName, setSnapshotFileName] = useState("");
   const load = useCallback(async () => setItems(await api("/operations")), []);
   useEffect(() => {
     load().catch((e) => setError(e.message));
@@ -1308,6 +2038,8 @@ function Operations({ me }: { me: Row }) {
     try {
       const d = await api("/operations/example");
       setText(JSON.stringify(d, null, 2));
+      setSnapshotFileName("Example format loaded");
+      setError("");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -1336,8 +2068,14 @@ function Operations({ me }: { me: Row }) {
       <Heading
         label="OPERATIONAL RECORDS"
         title="Operational records"
-        description="Historical synthetic snapshots are site-level evidence. They do not establish live status or a case’s root cause."
-      />
+        description="Historical site snapshots. Current status and case linkage require verification."
+      >
+        {me.role === "owner" && (
+          <a className="button" href="#snapshot-import">
+            Import snapshot
+          </a>
+        )}
+      </Heading>
       <ErrorBox error={error} />
       {message && (
         <p role="status" className="success">
@@ -1361,7 +2099,26 @@ function Operations({ me }: { me: Row }) {
                   </p>
                   <details>
                     <summary>Inspect records</summary>
-                    <pre>{JSON.stringify(g, null, 2)}</pre>
+                    {g.records.map((record: Row) => (
+                      <dl className="record-fields" key={record.id}>
+                        {Object.entries(record).map(([key, value]) => (
+                          <div key={key}>
+                            <dt>{key.replaceAll("_", " ")}</dt>
+                            <dd>
+                              {typeof value === "boolean"
+                                ? value
+                                  ? "Yes"
+                                  : "No"
+                                : String(value ?? "Not recorded")}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ))}
+                    <details className="technical">
+                      <summary>Technical JSON</summary>
+                      <pre>{JSON.stringify(g, null, 2)}</pre>
+                    </details>
                   </details>
                 </div>
               );
@@ -1370,38 +2127,63 @@ function Operations({ me }: { me: Row }) {
         ))}
       </div>
       {me.role === "owner" ? (
-        <form className="panel form-panel" onSubmit={save}>
+        <form id="snapshot-import" className="panel form-panel" onSubmit={save}>
           <h2>Import a synthetic snapshot</h2>
           <p>
             Use the example format. Both groups must share a matching snapshot,
             study, site, and observation time. Up to 10 records per group.
             Uploaded timestamps must not exceed the observation time.
           </p>
-          <div className="actions">
-            <button type="button" className="outline" onClick={example}>
+          <div className="snapshot-file-actions">
+            <button
+              type="button"
+              className="outline"
+              disabled={busy}
+              onClick={example}
+            >
               Load example format
             </button>
-            <label className="file-inline">
+            <button
+              type="button"
+              className="outline"
+              disabled={busy}
+              onClick={() => snapshotFile.current?.click()}
+            >
               Choose JSON file
-              <input
-                type="file"
-                accept=".json"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) {
-                    if (f.size > 100000)
-                      setError("Use a JSON file smaller than 100 KB.");
-                    else setText(await f.text());
-                  }
-                }}
-              />
-            </label>
+            </button>
+            <input
+              ref={snapshotFile}
+              className="hidden-file-input"
+              aria-label="Snapshot JSON file"
+              type="file"
+              accept=".json"
+              disabled={busy}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                if (f.size > 100000) {
+                  setError("Use a JSON file smaller than 100 KB.");
+                  return;
+                }
+                try {
+                  setText(await f.text());
+                  setSnapshotFileName(f.name);
+                  setError("");
+                } catch {
+                  setError("The file could not be read. Choose it again.");
+                }
+              }}
+            />
           </div>
+          <small className="snapshot-file-status" role="status">
+            {snapshotFileName || "No file selected · JSON up to 100 KB"}
+          </small>
           <label>
             Snapshot JSON
             <textarea
               className="code-editor"
-              rows={15}
+              rows={8}
               value={text}
               onChange={(e) => setText(e.target.value)}
               maxLength={100000}
@@ -1570,7 +2352,7 @@ function ROI({ me }: { me: Row }) {
               !["owner", "reviewer"].includes(me.role)
             }
           >
-            Save scenario
+            {busy ? "Saving…" : "Save scenario"}
           </button>
           {!runs.length && (
             <p className="notice">
@@ -1580,10 +2362,18 @@ function ROI({ me }: { me: Row }) {
         </form>
         <aside className="guide-card roi-preview">
           <p className="eyebrow">SCENARIO PREVIEW</p>
-          <h3>{Number.isFinite(minutes) ? minutes : "—"}</h3><p>Estimated minutes of capacity freed</p>
-          <h3>{Number.isFinite(value) ? money(value) : "—"}</h3><p>Estimated net capacity value</p>
+          <h3>{Number.isFinite(minutes) ? minutes : "—"}</h3>
+          <p>Estimated minutes of capacity freed</p>
+          <h3>{Number.isFinite(value) ? money(value) : "—"}</h3>
+          <p>Estimated net capacity value</p>
           <p className="notice">Scenario estimate · not cash savings</p>
-          <details><summary>How this is calculated</summary><p>Baseline minus human effort; minutes ÷ 60 × hourly cost, minus AI cost. Negative values are preserved.</p></details>
+          <details>
+            <summary>How this is calculated</summary>
+            <p>
+              Baseline minus human effort; minutes ÷ 60 × hourly cost, minus AI
+              cost. Negative values are preserved.
+            </p>
+          </details>
         </aside>
       </div>
       <h2>Recorded scenarios</h2>
@@ -1594,9 +2384,17 @@ function ROI({ me }: { me: Row }) {
           <article className="panel scenario-record" key={s.run_id}>
             <div>
               <h3>{s.title}</h3>
-              <small>
-                Run {s.run_id.slice(0, 8)} · {stamp(s.created_at)}
-              </small>
+              <small>{stamp(s.created_at)}</small>
+              <details className="technical">
+                <summary>Investigation reference</summary>
+                <Link
+                  className="text-link"
+                  href={"/workspace/runs/" + s.run_id}
+                >
+                  Open saved investigation →
+                </Link>
+                <p>Run {s.run_id}</p>
+              </details>
             </div>
             <div>
               <strong>{Number(s.baseline) - Number(s.assisted)} minutes</strong>
@@ -1662,8 +2460,25 @@ function Feedback({ me }: { me: Row }) {
       <form className="panel form-panel narrow" onSubmit={save}>
         <fieldset className="rating-buttons">
           <legend>How was your experience?</legend>
-          <div className="rating-options">{[1,2,3,4,5].map(n=><label key={n}><input type="radio" name="rating" value={n} checked={rating===String(n)} onChange={()=>setRating(String(n))} aria-label={n+" out of 5"}/><span>{n}</span></label>)}</div>
-          <div className="rating-labels"><span>Needs work</span><span>Excellent</span></div>
+          <div className="rating-options">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <label key={n}>
+                <input
+                  type="radio"
+                  name="rating"
+                  value={n}
+                  checked={rating === String(n)}
+                  onChange={() => setRating(String(n))}
+                  aria-label={n + " out of 5"}
+                />
+                <span>{n}</span>
+              </label>
+            ))}
+          </div>
+          <div className="rating-labels">
+            <span>Needs work</span>
+            <span>Excellent</span>
+          </div>
         </fieldset>
         <label>
           Your feedback
@@ -1677,10 +2492,10 @@ function Feedback({ me }: { me: Row }) {
             placeholder="What worked? Where did you get stuck? What would make this useful?"
           />
         </label>
-        <button disabled={busy || message.trim().length < 10}>
+        <button disabled={busy || message.trim().length < 10} aria-busy={busy}>
           {busy ? "Saving…" : "Submit feedback"}
         </button>
-        <small>
+        <small className="feedback-data-note">
           Feedback is stored in this deployment for up to 30 days. No email or
           external message is sent.
         </small>
@@ -1703,9 +2518,11 @@ function Feedback({ me }: { me: Row }) {
   );
 }
 function Settings({ me }: { me: Row }) {
-  const [section,setSection] = useState("preferences");
+  const [section, setSection] = useState("preferences");
   const currentPreferences = usePreferences(me.user_id);
-  const [display,setDisplay] = useState<DisplayPreferences>(()=>readPreferences(me.user_id));
+  const [display, setDisplay] = useState<DisplayPreferences>(() =>
+    readPreferences(me.user_id),
+  );
   const [members, setMembers] = useState<Row[]>([]),
     [role, setRole] = useState("reviewer"),
     [code, setCode] = useState(""),
@@ -1822,231 +2639,393 @@ function Settings({ me }: { me: Row }) {
         </p>
       )}
       <div className="settings-sections" aria-label="Settings sections">
-        {[["preferences","Preferences"],["team","Workspace & team"],...(me.role==="owner"?[["catalog","Studies & sites"]]:[]),["policy","Data policy"]].map(([key,label])=><button key={key} className={section===key?"":"outline"} aria-pressed={section===key} onClick={()=>{setSection(key);setMessage("");setError("");}}>{label}</button>)}
+        {[
+          ["preferences", "Preferences"],
+          ["team", "Workspace & team"],
+          ...(me.role === "owner" ? [["catalog", "Studies & sites"]] : []),
+          ["policy", "Data policy"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            className={section === key ? "" : "outline"}
+            aria-pressed={section === key}
+            onClick={() => {
+              setSection(key);
+              setMessage("");
+              setError("");
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      <section className="panel preferences-panel" hidden={section!=="preferences"}>
-        <h2>Your display preferences</h2><p className="subtle">Saved for this account in this browser. Team settings and text size stay unchanged.</p>
-        <div className="preference-row"><span><strong>Content spacing</strong><small>Adjust table and list row spacing.</small></span><PreferenceChoices name="display-density" legend="Content spacing" value={display.density} options={[["compact","Compact"],["comfortable","Comfortable"]]} onChange={value=>setDisplay({...display,density:value as DisplayPreferences["density"]})}/></div>
-        <div className="preference-row"><span><strong>Default page after sign-in</strong><small>Choose where to start working.</small></span><PreferenceChoices name="display-start-page" legend="Default page after sign-in" value={display.startPage} options={[["overview","Overview"],["cases","Cases"]]} onChange={value=>setDisplay({...display,startPage:value as DisplayPreferences["startPage"]})}/></div>
-        <button onClick={()=>{try{savePreferences(me.user_id,display);setMessage("Display preferences saved in this browser.");setError("");}catch{setError("This browser cannot store preferences. Allow local storage and try again.");}}}>Save preferences</button>
-        <small className="applied-preferences">Applied: {currentPreferences.density} spacing.</small>
-      </section>
-      <div hidden={section!=="team"}>
-      <div className="two-grid">
-        <section className="panel">
-          <h2>Your workspace</h2>
-          <label>
-            Switch workspace
-            <select
-              value={me.workspace_id}
-              onChange={(e) => change(e.target.value)}
-            >
-              {me.workspaces.map((w: Row) => (
-                <option key={w.id} value={w.id}>
-                  {w.name} · {w.role}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p>
-            {me.name} · {me.email}
-          </p>
-          <Badge value={me.role} />
-          <p className="subtle">
-            Owner: knowledge, snapshots, invitations, reviews, and resolution.
-            Reviewer: reviews and resolution. Analyst: intake, investigations,
-            assignment, and notes.
-          </p>
-          {me.role === "owner" && (
-            <button className="outline" disabled={busy} onClick={exportData}>
-              Export workspace records
-            </button>
-          )}
-        </section>
-        <section className="panel">
-          <h2>Members</h2>
-          {members.map((m) => (
-            <div className="member" key={m.id}>
-              <div>
-                <strong>{m.name}</strong>
-                <small>{m.email}</small>
-              </div>
-              <Badge value={m.role} />
-            </div>
-          ))}
-        </section>
-      </div>
-      {me.guest ? (
-        <section className="panel">
-          <h2>Keep a permanent workspace.</h2>
-          <p>
-            Your sample workspace expires after 24 hours. Export it before
-            expiry if you want a reference copy. Creating an account starts a
-            new workspace; it does not automatically transfer sample data.
-          </p>
-          <Link className="button" href="/sign-in?mode=register">
-            Create account →
-          </Link>
-        </section>
-      ) : (
-        <div className="two-grid">
-          {me.role === "owner" && (
-            <section className="panel">
-              <h2>Invite a teammate</h2>
-              <label>
-                Invitation role
-                <select aria-label="Invitation role" value={role} onChange={(e) => setRole(e.target.value)}>
-                  <option value="reviewer">Reviewer</option>
-                  <option value="analyst">Analyst</option>
-                </select>
-              </label>
-              <button disabled={busy} onClick={invite}>
-                Create invitation code
-              </button>
-              {code && (
-                <div className="notice">
-                  <strong>Share this one-use code directly.</strong>
-                  <pre>{code}</pre>
-                  <small>
-                    Expires in 24 hours. Anyone holding the code can join with
-                    the selected role. No invitation email was sent.
-                  </small>
-                </div>
-              )}
-            </section>
-          )}
-          <form className="panel form-panel" onSubmit={acceptInvite}>
-            <h2>Join another workspace</h2>
-            <label>
-              Invitation code
-              <input
-                value={accept}
-                onChange={(e) => setAccept(e.target.value)}
-                maxLength={128}
-                required
-                autoComplete="off"
-              />
-            </label>
-            <button disabled={busy || !accept.trim()}>Accept invitation</button>
-          </form>
+      <section
+        className="panel preferences-panel"
+        hidden={section !== "preferences"}
+      >
+        <h2>Your display preferences</h2>
+        <p className="subtle">Saved for this account in this browser.</p>
+        <div className="preference-row">
+          <span>
+            <strong>Content spacing</strong>
+            <small>Adjust table and list row spacing.</small>
+          </span>
+          <PreferenceChoices
+            name="display-density"
+            legend="Content spacing"
+            value={display.density}
+            options={[
+              ["compact", "Compact"],
+              ["comfortable", "Comfortable"],
+            ]}
+            onChange={(value) =>
+              setDisplay({
+                ...display,
+                density: value as DisplayPreferences["density"],
+              })
+            }
+          />
         </div>
-      )}
-      </div>
-      <div hidden={section!=="catalog"}>
-      {me.role === "owner" && (
-        <section className="panel">
-          <h2>Study and site contexts</h2>
-          <p>
-            Add your own synthetic operational contexts. IDs must be unique in
-            this workspace and contain 2–50 letters, numbers, underscores, or
-            hyphens. Maximum 50 studies and 200 sites.
-          </p>
+        <div className="preference-row">
+          <span>
+            <strong>Default page after sign-in</strong>
+            <small>Choose where to start working.</small>
+          </span>
+          <PreferenceChoices
+            name="display-start-page"
+            legend="Default page after sign-in"
+            value={display.startPage}
+            options={[
+              ["overview", "Overview"],
+              ["cases", "Cases"],
+            ]}
+            onChange={(value) =>
+              setDisplay({
+                ...display,
+                startPage: value as DisplayPreferences["startPage"],
+              })
+            }
+          />
+        </div>
+        <div className="preferences-footer">
+          <button
+            onClick={() => {
+              try {
+                savePreferences(me.user_id, display);
+                setMessage("Display preferences saved in this browser.");
+                setError("");
+              } catch {
+                setError(
+                  "This browser cannot store preferences. Allow local storage and try again.",
+                );
+              }
+            }}
+          >
+            Save preferences
+          </button>
+          <small className="applied-preferences">
+            Applied: {currentPreferences.density} spacing.
+          </small>
+        </div>
+      </section>
+      <div hidden={section !== "team"}>
+        <div className="two-grid">
+          <section className="panel">
+            <h2>Your workspace</h2>
+            <label>
+              Switch workspace
+              <select
+                value={me.workspace_id}
+                onChange={(e) => change(e.target.value)}
+              >
+                {me.workspaces.map((w: Row) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name} · {w.role}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>
+              {me.name} · {me.email}
+            </p>
+            <Badge value={me.role} />
+            <p className="subtle">
+              Owner: knowledge, snapshots, invitations, reviews, and resolution.
+              Reviewer: reviews and resolution. Analyst: intake, investigations,
+              assignment, and notes.
+            </p>
+            {me.role === "owner" && (
+              <button className="outline" disabled={busy} onClick={exportData}>
+                Export workspace records
+              </button>
+            )}
+          </section>
+          <section className="panel">
+            <h2>Members</h2>
+            {members.map((m) => (
+              <div className="member" key={m.id}>
+                <div>
+                  <strong>{m.name}</strong>
+                  <small>{m.email}</small>
+                </div>
+                <Badge value={m.role} />
+              </div>
+            ))}
+          </section>
+        </div>
+        {me.guest ? (
+          <section className="panel">
+            <h2>Keep a permanent workspace.</h2>
+            <p>
+              Your sample workspace expires after 24 hours. Export it before
+              expiry if you want a reference copy. Creating an account starts a
+              new workspace; it does not automatically transfer sample data.
+            </p>
+            <Link className="button" href="/sign-in?mode=register">
+              Create account →
+            </Link>
+          </section>
+        ) : (
           <div className="two-grid">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void createContext("studies");
-              }}
-            >
-              <h3>Add a study</h3>
+            {me.role === "owner" && (
+              <section className="panel">
+                <h2>Invite a teammate</h2>
+                <label>
+                  Invitation role
+                  <select
+                    aria-label="Invitation role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    <option value="reviewer">Reviewer</option>
+                    <option value="analyst">Analyst</option>
+                  </select>
+                </label>
+                <button disabled={busy} onClick={invite}>
+                  Create invitation code
+                </button>
+                {code && (
+                  <div className="notice">
+                    <strong>Share this one-use code directly.</strong>
+                    <pre>{code}</pre>
+                    <small>
+                      Expires in 24 hours. Anyone holding the code can join with
+                      the selected role. No invitation email was sent.
+                    </small>
+                  </div>
+                )}
+              </section>
+            )}
+            <form className="panel form-panel" onSubmit={acceptInvite}>
+              <h2>Join another workspace</h2>
               <label>
-                New study ID
+                Invitation code
                 <input
-                  value={context.study_id}
-                  onChange={(e) =>
-                    setContext({ ...context, study_id: e.target.value })
-                  }
+                  value={accept}
+                  onChange={(e) => setAccept(e.target.value)}
+                  maxLength={128}
                   required
-                  minLength={2}
-                  maxLength={50}
-                  pattern="[A-Za-z0-9][A-Za-z0-9_\-]{1,49}"
-                  placeholder="CT-SAMPLE-NEW"
+                  autoComplete="off"
                 />
               </label>
-              <label>
-                Study name
-                <input
-                  value={context.study_name}
-                  onChange={(e) =>
-                    setContext({ ...context, study_name: e.target.value })
-                  }
-                  required
-                  minLength={3}
-                  maxLength={200}
-                />
-              </label>
-              <button disabled={busy}>Add study</button>
-            </form>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void createContext("sites");
-              }}
-            >
-              <h3>Add a research site</h3>
-              <label>
-                New site ID
-                <input
-                  value={context.site_id}
-                  onChange={(e) =>
-                    setContext({ ...context, site_id: e.target.value })
-                  }
-                  required
-                  minLength={2}
-                  maxLength={50}
-                  pattern="[A-Za-z0-9][A-Za-z0-9_\-]{1,49}"
-                  placeholder="SITE-SAMPLE-NEW"
-                />
-              </label>
-              <label>
-                Site name
-                <input
-                  value={context.site_name}
-                  onChange={(e) =>
-                    setContext({ ...context, site_name: e.target.value })
-                  }
-                  required
-                  minLength={3}
-                  maxLength={200}
-                />
-              </label>
-              <label>
-                Site study
-                <select
-                  aria-label="Site study"
-                  value={context.site_study_id}
-                  onChange={(e) =>
-                    setContext({ ...context, site_study_id: e.target.value })
-                  }
-                  required
-                >
-                  <option value="">Select a study</option>
-                  {catalog.studies.map((study: Row) => (
-                    <option key={study.id} value={study.id}>
-                      {study.id} · {study.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button disabled={busy || !context.site_study_id}>
-                Add site
+              <button disabled={busy || !accept.trim()}>
+                Accept invitation
               </button>
             </form>
           </div>
-          <details className="catalog-list" open><summary>{catalog.studies.length} studies · {catalog.sites.length} sites</summary><div className="catalog-table">{catalog.studies.map((study:Row)=><article key={study.id}><strong>{study.id} · {study.name}</strong><div>{catalog.sites.filter((site:Row)=>site.study_id===study.id).map((site:Row)=><p key={site.id}>{site.id} · {site.name}</p>)}</div></article>)}</div></details>
-        </section>
-      )}
+        )}
       </div>
-      <div hidden={section!=="policy"}>
-      <div className="policy-cards">
-        <details className="panel" open><summary>What you can upload</summary><p>Operational procedures and non-patient sample records.</p><p>Do not upload patient information.</p></details>
-        <details className="panel"><summary>Review and resolution</summary><p>Approval records a review. Resolution is a separate decision. Drafts remain unsent.</p></details>
-        <details className="panel"><summary>Workspace data</summary><p>Owners can export workspace records. Your deployment operator manages retention, backups, and deletion. Email identifies your account and is not verified. Email password recovery is unavailable.</p></details>
-        <Link className="button outline" href="/guide#data-policy">Open data policy & guide →</Link>
-      </div>      </div>
+      <div hidden={section !== "catalog"}>
+        {me.role === "owner" && (
+          <section className="panel">
+            <h2>Study and site contexts</h2>
+            <p>
+              Add your own synthetic operational contexts. IDs must be unique in
+              this workspace and contain 2–50 letters, numbers, underscores, or
+              hyphens. Maximum 50 studies and 200 sites.
+            </p>
+            <div className="two-grid">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void createContext("studies");
+                }}
+              >
+                <h3>Add a study</h3>
+                <label>
+                  New study ID
+                  <input
+                    value={context.study_id}
+                    onChange={(e) =>
+                      setContext({ ...context, study_id: e.target.value })
+                    }
+                    required
+                    minLength={2}
+                    maxLength={50}
+                    pattern="[A-Za-z0-9][A-Za-z0-9_\-]{1,49}"
+                    placeholder="CT-SAMPLE-NEW"
+                  />
+                </label>
+                <label>
+                  Study name
+                  <input
+                    value={context.study_name}
+                    onChange={(e) =>
+                      setContext({ ...context, study_name: e.target.value })
+                    }
+                    required
+                    minLength={3}
+                    maxLength={200}
+                  />
+                </label>
+                <button disabled={busy}>Add study</button>
+              </form>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void createContext("sites");
+                }}
+              >
+                <h3>Add a research site</h3>
+                <label>
+                  New site ID
+                  <input
+                    value={context.site_id}
+                    onChange={(e) =>
+                      setContext({ ...context, site_id: e.target.value })
+                    }
+                    required
+                    minLength={2}
+                    maxLength={50}
+                    pattern="[A-Za-z0-9][A-Za-z0-9_\-]{1,49}"
+                    placeholder="SITE-SAMPLE-NEW"
+                  />
+                </label>
+                <label>
+                  Site name
+                  <input
+                    value={context.site_name}
+                    onChange={(e) =>
+                      setContext({ ...context, site_name: e.target.value })
+                    }
+                    required
+                    minLength={3}
+                    maxLength={200}
+                  />
+                </label>
+                <label>
+                  Site study
+                  <select
+                    aria-label="Site study"
+                    value={context.site_study_id}
+                    onChange={(e) =>
+                      setContext({ ...context, site_study_id: e.target.value })
+                    }
+                    required
+                  >
+                    <option value="">Select a study</option>
+                    {catalog.studies.map((study: Row) => (
+                      <option key={study.id} value={study.id}>
+                        {study.id} · {study.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button disabled={busy || !context.site_study_id}>
+                  Add site
+                </button>
+              </form>
+            </div>
+            <details className="catalog-list">
+              <summary>
+                {catalog.studies.length} studies · {catalog.sites.length} sites
+              </summary>
+              <div className="catalog-table">
+                {catalog.studies.map((study: Row) => (
+                  <article key={study.id}>
+                    <strong>
+                      {study.id} · {study.name}
+                    </strong>
+                    <div>
+                      {catalog.sites
+                        .filter((site: Row) => site.study_id === study.id)
+                        .map((site: Row) => (
+                          <p key={site.id}>
+                            {site.id} · {site.name}
+                          </p>
+                        ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </details>
+          </section>
+        )}
+      </div>
+      <div hidden={section !== "policy"}>
+        <div className="policy-cards">
+          <details className="panel" open>
+            <summary>What you can upload</summary>
+            <p>Operational procedures and non-patient sample records.</p>
+            <p>Do not upload patient information.</p>
+          </details>
+          <details className="panel">
+            <summary>Review and resolution</summary>
+            <p>
+              Approval records a review. Resolution is a separate decision.
+              Drafts remain unsent.
+            </p>
+          </details>
+          <details className="panel">
+            <summary>Workspace data</summary>
+            <p>
+              Owners can export workspace records. Your deployment operator
+              manages retention, backups, and deletion. Email identifies your
+              account and is not verified. Email password recovery is
+              unavailable.
+            </p>
+          </details>
+          <Link className="button outline" href="/guide#data-policy">
+            Open data policy & guide →
+          </Link>
+        </div>{" "}
+      </div>
 
+      <div hidden={section !== "policy"}>
+        <WorkspacePolicies me={me} />
+      </div>
     </>
   );
 }
 
-function PreferenceChoices({name,legend,value,options,onChange}:{name:string;legend:string;value:string;options:string[][];onChange:(value:string)=>void}){return <fieldset className="preference-options"><legend className="visually-hidden">{legend}</legend>{options.map(([key,label])=><label key={key}><input type="radio" name={name} value={key} checked={value===key} onChange={()=>onChange(key)}/><span>{label}</span></label>)}</fieldset>;}
+function PreferenceChoices({
+  name,
+  legend,
+  value,
+  options,
+  onChange,
+}: {
+  name: string;
+  legend: string;
+  value: string;
+  options: string[][];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <fieldset className="preference-options">
+      <legend className="visually-hidden">{legend}</legend>
+      {options.map(([key, label]) => (
+        <label key={key}>
+          <input
+            type="radio"
+            name={name}
+            value={key}
+            checked={value === key}
+            onChange={() => onChange(key)}
+          />
+          <span>{label}</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+}

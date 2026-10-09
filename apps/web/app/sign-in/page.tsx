@@ -49,7 +49,7 @@ export default function SignIn() {
         <p>
           {mode === "login"
             ? "Sign in to reopen your cases and saved decisions."
-            : "Create your workspace and keep every decision together."}
+            : "Start a workspace for your team."}
         </p>
         <div className="tabs" role="tablist" aria-label="Account access" onKeyDown={e=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(e.key))return;e.preventDefault();const next=e.key==="Home"?"login":e.key==="End"?"register":mode==="login"?"register":"login";setMode(next);setError("");(e.currentTarget.querySelector(`[data-mode="${next}"]`) as HTMLButtonElement)?.focus();}}>
           <button
