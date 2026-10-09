@@ -1,0 +1,13 @@
+{
+  "name": "trialops-browser-checks",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node check.cjs",
+    "test:ux": "node ux-check.cjs",
+    "test:workflows": "node workflow-check.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

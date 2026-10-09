@@ -1,0 +1,80 @@
+name: trialops-release
+x-api: &api
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  environment: &api-env
+    DB_PASSWORD_FILE: /run/secrets/db_password
+    INTERNAL_KEY_FILE: /run/secrets/internal_key
+    AI_MODE: ${AI_MODE:-procedure}
+    OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+    COOKIE_SECURE: "false"
+    ENABLE_DEMO: "true"
+    ENABLE_SIGNUP: "true"
+    DEMO_HOURLY_LIMIT: "100"
+    SIGNUP_HOURLY_LIMIT: "50"
+  secrets: [db_password, internal_key]
+  extra_hosts: ["host.docker.internal:host-gateway"]
+  depends_on:
+    db: {condition: service_healthy}
+  restart: unless-stopped
+  init: true
+  security_opt: ["no-new-privileges:true"]
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: trialops
+      POSTGRES_DB: trialops
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U trialops -d trialops"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  api:
+    <<: *api
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  worker:
+    <<: *api
+    command: [python, worker.py]
+    healthcheck:
+      test: [CMD, python, -c, "import pathlib,time; p=pathlib.Path('/tmp/trialops-worker-heartbeat'); assert p.exists() and time.time()-p.stat().st_mtime<600"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_URL: http://api:8000
+      INTERNAL_KEY_FILE: /run/secrets/internal_key
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3001}
+    secrets: [internal_key]
+    ports: ["127.0.0.1:${WEB_PORT:-3001}:3000"]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+volumes:
+  database:
+secrets:
+  db_password: {file: ./.secrets/db_password}
+  internal_key: {file: ./.secrets/internal_key}

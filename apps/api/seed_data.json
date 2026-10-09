@@ -1,0 +1,32 @@
+[
+  {
+    "id": "KB-001",
+    "title": "Uploaded training certificate missing from binder",
+    "content": "Check the upload receipt, document processing status, study assignment, and binder filters. A processing delay is one possible cause. If processing remains pending for 15 minutes, draft an engineering escalation with the document ID and upload timestamp. Do not alter the document.",
+    "category": "document_workflow"
+  },
+  {
+    "id": "KB-002",
+    "title": "Monitor cannot access a study",
+    "content": "Verify the monitor identity, invitation acceptance, study assignment, and access expiration. Ask an authorized administrator to review permissions. Do not grant access automatically.",
+    "category": "access"
+  },
+  {
+    "id": "KB-003",
+    "title": "Electronic signature request remains pending",
+    "content": "Check recipient identity, delivery status, and signature workflow status. Draft a reminder for human review. Never sign on behalf of a user.",
+    "category": "signature"
+  },
+  {
+    "id": "KB-004",
+    "title": "Binder synchronization has stalled",
+    "content": "Compare source and destination synchronization timestamps and inspect the synchronization job status. Draft an escalation if the job has failed. Do not overwrite regulatory records.",
+    "category": "synchronization"
+  },
+  {
+    "id": "KB-005",
+    "title": "Training completion not reflected in dashboard",
+    "content": "Check the training completion record, course version, study assignment, and dashboard refresh timestamp. Recommend a refresh or draft an escalation when records disagree.",
+    "category": "training"
+  }
+]

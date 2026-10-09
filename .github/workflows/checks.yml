@@ -1,0 +1,40 @@
+name: TrialOps checks
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  full-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build and start isolated procedure-mode installation
+        run: |
+          cp .env.example .env
+          bash install.sh
+      - name: Policies, API, PostgreSQL, worker, and MCP integration
+        run: bash scripts/test.sh
+      - name: Install browser test dependencies
+        working-directory: tests/browser
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Browser workflows and responsive layouts
+        working-directory: tests/browser
+        run: |
+          npm test
+          npm run test:ux
+          npm run test:workflows
+      - name: Save diagnostic logs on failure
+        if: failure()
+        run: docker compose logs --tail=100 api worker web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-checks
+          path: tests/browser/screenshots/
+          retention-days: 7
+      - name: Stop test installation
+        if: always()
+        run: docker compose down

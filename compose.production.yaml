@@ -1,0 +1,30 @@
+services:
+  api:
+    environment:
+      COOKIE_SECURE: "true"
+      ENABLE_SIGNUP: ${ENABLE_SIGNUP:-true}
+      ENABLE_DEMO: ${ENABLE_DEMO:-true}
+      DEMO_HOURLY_LIMIT: ${DEMO_HOURLY_LIMIT:-30}
+      SIGNUP_HOURLY_LIMIT: ${SIGNUP_HOURLY_LIMIT:-20}
+  worker:
+    environment:
+      COOKIE_SECURE: "true"
+  web:
+    ports: !reset []
+    environment:
+      APP_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
+  caddy:
+    image: caddy:2
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web: {condition: service_healthy}
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:

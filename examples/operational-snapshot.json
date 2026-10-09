@@ -1,0 +1,53 @@
+{
+  "study_id": "CT-204",
+  "site_id": "SITE-104",
+  "evidence": {
+    "synchronization": {
+      "snapshot": {
+        "id": "OPS-104-SAMPLE",
+        "study_id": "CT-204",
+        "site_id": "SITE-104",
+        "synthetic": true,
+        "observed_at": "2026-10-07T20:00:00Z"
+      },
+      "records": [
+        {
+          "id": "SYNC-104-001",
+          "snapshot_id": "OPS-104-SAMPLE",
+          "source_binder_id": "BINDER-104-SOURCE",
+          "destination_binder_id": "BINDER-104-DEST",
+          "status": "failed",
+          "source_updated_at": "2026-10-07T19:40:00Z",
+          "destination_updated_at": "2026-10-07T19:10:00Z",
+          "last_attempt_at": "2026-10-07T19:50:00Z",
+          "error_code": "SYNC_TIMEOUT"
+        }
+      ],
+      "truncated": false
+    },
+    "document_processing": {
+      "snapshot": {
+        "id": "OPS-104-SAMPLE",
+        "study_id": "CT-204",
+        "site_id": "SITE-104",
+        "synthetic": true,
+        "observed_at": "2026-10-07T20:00:00Z"
+      },
+      "records": [
+        {
+          "id": "PROC-104-001",
+          "snapshot_id": "OPS-104-SAMPLE",
+          "document_id": "DOC-104-CERT-001",
+          "document_type": "training_certificate",
+          "upload_receipt_id": "UPLOAD-104-001",
+          "uploaded_at": "2026-10-07T19:35:00Z",
+          "status_since": "2026-10-07T19:35:00Z",
+          "processing_status": "pending",
+          "assigned_study_id": "CT-204",
+          "binder_visible": false
+        }
+      ],
+      "truncated": false
+    }
+  }
+}

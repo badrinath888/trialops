@@ -1,0 +1,9 @@
+{$DOMAIN} {
+    request_body {
+        max_size 2108000
+    }
+    header Strict-Transport-Security "max-age=31536000"
+    reverse_proxy web:3000 {
+        header_up X-Forwarded-For {remote_host}
+    }
+}

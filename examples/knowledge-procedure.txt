@@ -1,0 +1,5 @@
+Synthetic operational procedure: certificate upload checks
+
+Check the upload receipt, document processing status, assigned study, and binder visibility. Record what the current operational system reports before considering an escalation. Do not alter source documents. Ask a reviewer to confirm the next step.
+
+This example is for synthetic evaluation only. It does not automatically register a new escalation rule.

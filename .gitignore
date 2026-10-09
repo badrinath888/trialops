@@ -1,0 +1,28 @@
+.env
+.secrets/
+backups/
+exports/
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.DS_Store
+*.tsbuildinfo
+tests/browser/screenshots/
+
+# Private configuration and user data
+.env.*
+!.env.example
+.secrets/
+uploads/
+**/uploads/
+*.dump
+*.backup
+*.log
+# Generated artifacts
+previews/
+.venv/
+venv/
+coverage/
+playwright-report/
+test-results/
