@@ -25,7 +25,10 @@ fs.mkdirSync(out, { recursive: true });
       );
   });
   page.on("pageerror", (e) => report.errors.push(e.message));
+  let caseNavigations = 0;
   const go = async (p) => {
+    // Renew the real session budget before revisiting the populated case.
+    if(p.startsWith("/workspace/cases/") && ++caseNavigations > 1) await page.waitForTimeout(61000);
     console.log("Review", p);
     await page.goto(base + p);
     await page.waitForLoadState("networkidle");

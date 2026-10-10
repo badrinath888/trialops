@@ -1,4 +1,5 @@
 "use client";
+import {WaitingQueue,SupportDirectory,EmailVerification} from "../../five-feature-panels";
 import {AssessmentPanel} from "../../assessment-panel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -257,6 +258,7 @@ export default function Workspace() {
             <>
               <Overview me={me} />
               <OverviewRelease me={me} />
+              <WaitingQueue />
             </>
           ) : view === "new" ? (
             <Intake />
@@ -288,7 +290,7 @@ export default function Workspace() {
           ) : view === "feedback" ? (
             <Feedback me={me} />
           ) : view === "settings" ? (
-            <Settings me={me} />
+            <><Settings me={me} /><EmailVerification me={me}/><SupportDirectory me={me}/></>
           ) : (
             <Empty title="Page not found">
               <Link href="/workspace">Return to overview</Link>

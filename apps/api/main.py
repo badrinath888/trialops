@@ -185,6 +185,8 @@ def register(body: Register, request: Request, response: Response):
             )
         raise
     session(response, u, w)
+    from account_access import issue
+    issue(u,'verify')
     return {"workspace_id": w}
 
 
@@ -554,7 +556,11 @@ def detail(case_id: str, a=Depends(actor)):
 @app.post("/cases/{case_id}/assignment")
 def assignment(case_id: str, body: Assignment, a=Depends(actor)):
     with connect() as c:
+        from five_features import current
+        current(c,a,True)
         old = get_case(a, case_id, c, True)
+        if body.owner_id!=old['owner_id'] and c.execute("SELECT 1 FROM case_handovers WHERE workspace_id=%s AND case_id=%s AND status='pending'",(a['workspace_id'],case_id)).fetchone():
+            raise HTTPException(409,'Current owner is retained until handover acceptance. Cancel the handover before changing assignment.')
         if body.expected_updated_at and body.expected_updated_at != old["updated_at"]:
             raise HTTPException(409, "Assignment changed. Reload before saving.")
         if (
@@ -1127,6 +1133,10 @@ def export(a=Depends(actor)):
             table: query(f"SELECT * FROM {table} WHERE workspace_id=%s", (w,))
             for table in (
                 "workspace_policies",
+                "case_handovers",
+                "case_blockers",
+                "support_contacts",
+                "support_contact_events",
                 "procedure_versions",
                 "snapshot_history",
                 "investigation_checks",
@@ -1152,3 +1162,8 @@ app.include_router(release_router)
 
 from assessments import router as assessment_router
 app.include_router(assessment_router)
+
+from account_access import router as account_router
+from five_features import router as five_router
+app.include_router(account_router)
+app.include_router(five_router)

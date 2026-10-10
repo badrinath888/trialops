@@ -1,0 +1,8 @@
+# Application-only rollback; retain additive schema and all data.
+services:
+  api:
+    image: trialops-release-api:pre-five-cc838b7
+  worker:
+    image: trialops-release-worker:pre-five-cc838b7
+  web:
+    image: trialops-release-web:pre-five-cc838b7

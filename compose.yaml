@@ -9,6 +9,14 @@ x-api: &api
     AI_MODE: ${AI_MODE:-procedure}
     OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
     OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+    SMTP_HOST: ${SMTP_HOST:-}
+    SMTP_PORT: ${SMTP_PORT:-587}
+    SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+    SMTP_SSL: ${SMTP_SSL:-false}
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    MAIL_FROM: ${MAIL_FROM:-}
+    APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3001}
     COOKIE_SECURE: "false"
     ENABLE_DEMO: "true"
     ENABLE_SIGNUP: "true"

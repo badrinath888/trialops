@@ -102,3 +102,15 @@ migration003 and affected-service local deployment complete. Both original
 databases/accounts/run/checklist fingerprints preserved. Live3001 healthy and
 full isolated sample workflow passed. See ASSESSMENT-VERIFICATION.md for exact
 results/coverage limits; source commit follows.
+
+## Five-feature extension — 2026-10-10
+Implementation complete: account recovery/verification, acknowledged handover,
+deterministic duplicate-request warning, multiple blockers with union waiting time,
+and workspace contact directory. See FIVE-FEATURE-SPEC.md and
+FIVE-FEATURE-RELEASE.md for locations/configuration/rollback. Migrations004–006
+applied to preserved test and live databases after restore verification. Tested
+application images deployed only locally to3001; all live services healthy.
+Focused browser passed18 states on3002 and14 on3001. Original permanent-record
+fingerprints match both databases; original private-file fingerprints match.
+No external email configured on live. Actual checks/limits:
+FIVE-FEATURE-VERIFICATION.md; exact working state: DEV-CHECKPOINT.md.

@@ -259,6 +259,7 @@ def cleanup():
     with connect() as c:
         c.execute("DELETE FROM workspaces WHERE expires_at<now()")
         c.execute("DELETE FROM sessions WHERE expires_at<now()")
+        c.execute("DELETE FROM account_tokens WHERE expires_at<now()-interval '2 days'")
         c.execute(
             "DELETE FROM users WHERE guest AND NOT EXISTS(SELECT 1 FROM memberships m WHERE m.user_id=users.id)"
         )

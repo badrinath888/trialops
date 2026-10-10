@@ -27,7 +27,7 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
         ? data.detail
         : Array.isArray(data.detail)
           ? "Check the required fields and try again."
-          : "Request failed",
+          : typeof data.detail?.message === "string" ? data.detail.message : "Request failed",
       r.status,
     );
   return data;

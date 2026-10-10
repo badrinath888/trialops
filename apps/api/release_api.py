@@ -3,6 +3,7 @@
 import difflib, json
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
+from fastapi.encoders import jsonable_encoder
 from fastapi import APIRouter, Depends, HTTPException, Response
 from psycopg.types.json import Jsonb
 from db import connect, query, one
@@ -374,7 +375,7 @@ def add_evidence(cid: str, body: EvidenceCreate, a=Depends(actor)):
 @router.post("/cases/{cid}/requests", status_code=201)
 def create_request(cid: str, body: RequestCreate, a=Depends(actor)):
     with connect() as c:
-        case(a, cid, c, True)
+        item = case(a, cid, c, True)
         r = run(a, body.run_id, c)
         if r["case_id"] != cid:
             raise HTTPException(422, "Request investigation must belong to this case.")
@@ -391,11 +392,19 @@ def create_request(cid: str, body: RequestCreate, a=Depends(actor)):
                 or old["run_id"] != body.run_id
                 or old["owner_id"] != body.owner_id
                 or old["due_at"] != body.due_at
+                or old["contact_id"] != body.contact_id
+                or old["duplicate_reason"] != body.duplicate_reason
             ):
                 raise HTTPException(
                     409, "Request ID already contains a different request."
                 )
             return request_view(old)
+        from five_features import current, contact_ref, duplicate_matches
+        current(c,a,True)
+        contact_ref(c,a,body.contact_id,item['study_id'],item['site_id'])
+        matches=duplicate_matches(c,a,item,body.items)
+        if matches and len(body.duplicate_reason.strip())<10:
+            raise HTTPException(409,jsonable_encoder({'message':'An open request asks for the same evidence. Reuse it or provide a reason to proceed.','matches':matches}))
         row = c.execute(
             "INSERT INTO information_requests(workspace_id,id,case_id,run_id,title,items,owner_id,due_at,actor_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *",
             (
@@ -410,6 +419,7 @@ def create_request(cid: str, body: RequestCreate, a=Depends(actor)):
                 a["user_id"],
             ),
         ).fetchone()
+        row=c.execute('UPDATE information_requests SET contact_id=%s,duplicate_reason=%s WHERE workspace_id=%s AND id=%s RETURNING *',(body.contact_id,body.duplicate_reason,a['workspace_id'],body.id)).fetchone()
         audit(
             c,
             a,
@@ -417,7 +427,7 @@ def create_request(cid: str, body: RequestCreate, a=Depends(actor)):
             "information_request_drafted",
             body.title,
             body.run_id,
-            {"request_id": str(body.id), "items": body.items, "no_message_sent": True},
+            {"request_id": str(body.id), "items": body.items, "no_message_sent": True, "duplicate_reason":body.duplicate_reason, "contact_id":str(body.contact_id) if body.contact_id else None},
         )
         return request_view(row)
 
@@ -431,6 +441,13 @@ def edit_request(cid: str, request_id: UUID, body: RequestEdit, a=Depends(actor)
         )
         if row["case_id"] != cid:
             raise HTTPException(404, "Request not found for this case.")
+        from five_features import current,contact_ref,duplicate_matches
+        current(c,a,True)
+        item=case(a,cid,c)
+        if 'contact_id' in body.model_fields_set and body.contact_id!=row['contact_id']:contact_ref(c,a,body.contact_id,item['study_id'],item['site_id'])
+        if row['items']!=body.items:
+            matches=duplicate_matches(c,a,item,body.items,request_id)
+            if matches and len(body.duplicate_reason.strip())<10:raise HTTPException(409,jsonable_encoder({'message':'An open request asks for the same evidence. Reuse it or provide a reason.','matches':matches}))
         member(c, a, body.owner_id)
         refs(c, a, cid, body.evidence_refs)
         allowed = {
@@ -477,6 +494,7 @@ def edit_request(cid: str, request_id: UUID, body: RequestEdit, a=Depends(actor)
                 request_id,
             ),
         ).fetchone()
+        updated=c.execute('UPDATE information_requests SET contact_id=%s,duplicate_reason=%s WHERE workspace_id=%s AND id=%s RETURNING *',(body.contact_id if 'contact_id' in body.model_fields_set else row['contact_id'],body.duplicate_reason or row['duplicate_reason'],a['workspace_id'],request_id)).fetchone()
         audit(
             c,
             a,
@@ -1326,6 +1344,8 @@ def case_package(a, cid):
             "effort": "human_effort",
             "assessments": "case_assessments",
             "assessment_decisions": "assessment_decisions",
+            "handovers": "case_handovers",
+            "blockers": "case_blockers",
         }
         package = {
             key: c.execute(
@@ -1340,6 +1360,8 @@ def case_package(a, cid):
         else:
             package["assessments"] = []
             package["assessment_decisions"] = []
+        from five_features import blocked_seconds
+        package['waiting_time']=[{'blocked_seconds':blocked_seconds(package['blockers'],item['resolved_at'] or datetime.now(timezone.utc)),'interpretation':'Overlapping intervals counted once; elapsed waiting, not human effort.'}]
         package["case"] = item
         package["events"].sort(key=lambda e: e["id"])
         package["runs"].sort(key=lambda r: r["created_at"])

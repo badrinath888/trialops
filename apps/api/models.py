@@ -182,6 +182,8 @@ class CheckEdit(Versioned):
 
 class RequestCreate(Model):
     id: UUID
+    contact_id: UUID | None = None
+    duplicate_reason: str = Field(default="", max_length=2000)
     run_id: UUID
     title: Text = Field(min_length=5, max_length=200)
     items: list[
@@ -195,6 +197,8 @@ class RequestCreate(Model):
 
 
 class RequestEdit(Versioned):
+    contact_id: UUID | None = None
+    duplicate_reason: str = Field(default="", max_length=2000)
     title: Text = Field(min_length=5, max_length=200)
     items: list[
         Annotated[

@@ -31,7 +31,7 @@ def password_ok(value, stored):
 
 def actor(request: Request):
     row = one(
-        """SELECT u.id AS user_id,u.name,u.email,u.guest,s.workspace_id,m.role,w.name AS workspace_name,w.demo
+        """SELECT u.id AS user_id,u.name,u.email,u.guest,u.email_verified_at,s.workspace_id,m.role,w.name AS workspace_name,w.demo
       FROM sessions s JOIN users u ON u.id=s.user_id JOIN workspaces w ON w.id=s.workspace_id
       JOIN memberships m ON m.workspace_id=s.workspace_id AND m.user_id=s.user_id
       WHERE s.token_hash=%s AND s.expires_at>now() AND (w.expires_at IS NULL OR w.expires_at>now())""",

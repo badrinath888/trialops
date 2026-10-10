@@ -2,6 +2,11 @@
 services:
   api:
     environment:
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_STARTTLS: "false"
+      MAIL_FROM: trialops@sample.invalid
+      APP_PUBLIC_URL: http://localhost:3002
       AI_MODE: procedure
       DEMO_HOURLY_LIMIT: "500"
       DEMO_IP_HOURLY_LIMIT: "500"
@@ -14,3 +19,10 @@ services:
     environment:
       APP_ORIGIN: http://localhost:3002
     ports: !override ["127.0.0.1:3002:3000"]
+
+  mailpit:
+    image: axllent/mailpit:v1.20.5
+    environment:
+      MP_MAX_MESSAGES: "200"
+    ports: ["127.0.0.1:8026:8025"]
+    restart: unless-stopped

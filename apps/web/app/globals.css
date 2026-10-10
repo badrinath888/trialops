@@ -2409,3 +2409,7 @@ input[type="checkbox"] { width:18px; height:18px; min-height:0; padding:0; margi
 .assessment-content pre { max-width:100%; max-height:360px; overflow:auto; }
 .assessment-content blockquote { margin:12px 0; padding-left:12px; border-left:3px solid #98522e; overflow-wrap:anywhere; }
 .assessment-content article,.assessment-result { border-top:1px solid var(--line); padding-block:12px; }
+
+/* Compact continuity panels reuse existing graphite/copper controls. */
+.panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+.panel details{margin-block:10px}.panel summary{cursor:pointer;overflow-wrap:anywhere}

@@ -1,4 +1,5 @@
 "use client";
+import {ContinuityPanel,ContactSelect} from "./five-feature-panels";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {AssessmentPanel} from "./assessment-panel";
@@ -115,6 +116,7 @@ export function CaseWorkflows({
     [requestOwner, setRequestOwner] = useState(""),
     [requestDue, setRequestDue] = useState(""),
     [requestId, setRequestId] = useState("");
+  const [requestContact,setRequestContact]=useState(""),[duplicateReason,setDuplicateReason]=useState(""),[matches,setMatches]=useState<Row[]>([]),[reused,setReused]=useState("");
   const [kind, setKind] = useState("human_observation"),
     [reference, setReference] = useState(""),
     [summary, setSummary] = useState(""),
@@ -226,6 +228,7 @@ export function CaseWorkflows({
         </div>
       </div>
       <Status error={error} message={message} busy={busy} />
+      <ContinuityPanel item={item} me={me} onChanged={onChanged}/>
       {canReview && <AssessmentPanel cid={cid} kind="linkage" onChanged={onChanged} />}
         <div
         className="workflow-tabs"
@@ -519,8 +522,10 @@ export function CaseWorkflows({
           </div>
           <div hidden={tab !== "requests"}>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
+                if(busy)return;setBusy(true);
+                try {const m=await api(base+"/request-matches",{items:requested.split("\n").map(v=>v.trim()).filter(Boolean)});setMatches(m);if(m.length&&duplicateReason.trim().length<10){setBusy(false);return;}}catch(e){setError((e as Error).message);setBusy(false);return;}
                 const id = requestId || crypto.randomUUID();
                 setRequestId(id);
                 void save(
@@ -528,7 +533,7 @@ export function CaseWorkflows({
                   {
                     id,
                     run_id: runId,
-                    title,
+                    title,contact_id:requestContact||null,duplicate_reason:duplicateReason,
                     items: requested
                       .split("\n")
                       .map((x) => x.trim())
@@ -540,12 +545,15 @@ export function CaseWorkflows({
                   () => {
                     setTitle("");
                     setRequested("");
-                    setRequestId("");
+                    setRequestId("");setMatches([]);setDuplicateReason("");setRequestContact("");setReused("");
                   },
                 );
               }}
             >
               <h3>Draft an information request</h3>
+              <ContactSelect item={item} value={requestContact} onChange={setRequestContact}/>
+              {matches.length>0&&<div className="notice"><strong>Open request asks for the same evidence</strong>{matches.map(m=><p key={m.id}>{m.title} · <a href={"/workspace/cases/"+encodeURIComponent(m.case_id)}>Open existing request case {m.case_id}</a><br/>{m.explanation}<br/>{m.matched_items.join('; ')}<button type="button" className="outline" onClick={()=>{setReused(m.id);setRequested('');setMatches([]);setDuplicateReason('');setMessage('Existing request reused. No new request or message created.')}}>Reuse existing request</button></p>)}<label>Reason to proceed with a separate request<textarea minLength={10} maxLength={2000} value={duplicateReason} onChange={e=>setDuplicateReason(e.target.value)}/></label></div>}
+              {reused&&<p role="status">Reusing request {reused}; see Saved requests or its case. No duplicate created.</p>}
               <label>
                 Request title
                 <input
@@ -602,6 +610,7 @@ export function CaseWorkflows({
                 <RequestEditor
                   key={r.id + ":" + r.version}
                   request={r}
+                  caseItem={item}
                   evidence={data.evidence}
                   members={members}
                   busy={busy}
@@ -986,6 +995,7 @@ export function CaseWorkflows({
 
 function RequestEditor({
   request: r,
+  caseItem,
   evidence,
   members,
   busy,
@@ -993,12 +1003,14 @@ function RequestEditor({
   onError,
 }: {
   request: Row;
+  caseItem: Row;
   evidence: Row[];
   members: Row[];
   busy: boolean;
   onSave: (v: Row) => void;
   onError: (e: string) => void;
 }) {
+  const [contactId,setContactId]=useState(r.contact_id||""),[overrideReason,setOverrideReason]=useState(r.duplicate_reason||"");
   const [title, setTitle] = useState(r.title),
     [items, setItems] = useState(r.items.join("\n")),
     [owner, setOwner] = useState(r.owner_id || ""),
@@ -1032,6 +1044,8 @@ function RequestEditor({
         </button>
       </div>
       {copyMessage && <p role="status">{copyMessage}</p>}
+      <ContactSelect item={caseItem} value={contactId} onChange={setContactId}/>
+      {r.status==="draft"&&<label>Reason for separate evidence request<textarea maxLength={2000} value={overrideReason} onChange={e=>setOverrideReason(e.target.value)}/></label>}
       <details>
         <summary>Copyable request text</summary>
         <pre>{r.copy_text}</pre>
@@ -1040,7 +1054,7 @@ function RequestEditor({
         onSubmit={(e) => {
           e.preventDefault();
           onSave({
-            expected_version: r.version,
+            expected_version: r.version,contact_id:contactId||null,duplicate_reason:overrideReason,
             title,
             items: items
               .split("\n")

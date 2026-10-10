@@ -45,6 +45,7 @@ export default function SignIn() {
       <section className="auth-form-area">
       <div className="auth-card">
         <p className="eyebrow">YOUR OPERATIONS WORKSPACE</p>
+        <Link href="/account-access">Forgot password?</Link>
         <h1>{mode === "login" ? "Welcome back." : "Create your workspace."}</h1>
         <p>
           {mode === "login"

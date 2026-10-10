@@ -57,6 +57,10 @@ def scan_reminders():
                             item["owner_id"],
                         )
                     )
+            for b in c.execute("SELECT * FROM case_blockers WHERE workspace_id=%s AND cleared_at IS NULL AND follow_up_at<=%s",(w['id'],now+timedelta(hours=w['reminder_lead_hours'] if w['reminder_lead_hours'] is not None else 24))).fetchall():
+                if b['case_id'] in open_cases:alerts.append(('deadline',b['case_id'],'Blocker follow-up: '+b['waiting_on'],'blocker:'+str(b['id'])+':'+b['follow_up_at'].isoformat(),b['responsible_id']))
+            for h in c.execute("SELECT * FROM case_handovers WHERE workspace_id=%s AND status='pending'",(w['id'],)).fetchall():
+                if h['case_id'] in open_cases:alerts.append(('deadline',h['case_id'],'Handover awaiting your acknowledgment: '+open_cases[h['case_id']]['title'],'handover:'+str(h['id']),h['recipient_id']))
             for r in c.execute(
                 "SELECT * FROM information_requests WHERE workspace_id=%s AND status='requested' AND due_at<now()",
                 (w["id"],),
