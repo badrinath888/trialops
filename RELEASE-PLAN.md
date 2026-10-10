@@ -93,3 +93,12 @@ present (one immutable baseline per study/site); unselected native selectors
 show their choice prompt until the reviewer selects a snapshot.
 The verified release is committed with this completion checkpoint;
 all remaining limits are coverage/scale limitations, not unfinished scope.
+
+Connected capability extension checkpoint and ledger: ASSESSMENT-PLAN.md. Original fourteen-feature completion remains intact; extension delivery/results: CONNECTED-ASSESSMENTS.md and ASSESSMENT-VERIFICATION.md.
+
+Final connected-capability checkpoint: implementation, semantic/security/browser
+verification, complete PDF/JSON review, fresh restore-verified backups, additive
+migration003 and affected-service local deployment complete. Both original
+databases/accounts/run/checklist fingerprints preserved. Live3001 healthy and
+full isolated sample workflow passed. See ASSESSMENT-VERIFICATION.md for exact
+results/coverage limits; source commit follows.

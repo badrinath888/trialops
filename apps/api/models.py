@@ -300,6 +300,7 @@ class NotificationPrefs(Model):
 class EvaluationCreate(Model):
     id: UUID
     mode: Literal["procedure", "ollama"]
+    suite: Literal["investigation", "assessments"] = "investigation"
 
 
 class WalkthroughUpdate(Model):

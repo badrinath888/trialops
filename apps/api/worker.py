@@ -37,6 +37,10 @@ def claim():
 def process(job):
     started = time.monotonic()
     w = job["workspace_id"]
+    if job["kind"] == "assess":
+        from assessments import process_assessment
+        process_assessment(job)
+        return
     if job["kind"] == "evaluate":
         from evaluation import evaluate
         from reminders import scan_reminders
@@ -58,8 +62,12 @@ def process(job):
                     raise ValueError("Evaluation lease lost")
             scan_reminders()
 
+        if entry["configuration"].get("suite") == "assessments":
+            from assessments import fresh_actor
+            with connect() as c: fresh_actor(c,w,job["actor_id"])
         result = evaluate(entry["configuration"], renew)
         with connect() as c:
+            if entry["configuration"].get("suite") == "assessments": fresh_actor(c,w,job["actor_id"])
             lease = c.execute(
                 "SELECT * FROM jobs WHERE id=%s FOR UPDATE", (job["id"],)
             ).fetchone()
@@ -230,6 +238,8 @@ def run_once():
             if job["kind"] == "investigate"
             else "Evaluation failed. Retry the evaluation; no operational cases were changed."
             if job["kind"] == "evaluate"
+            else "Assessment unavailable or failed. Check local Ollama, evidence and reviewer permissions; retry within the limit. No external action was executed."
+            if job["kind"] == "assess"
             else "Embedding failed. Text search remains available. Check the model and save the procedure again to retry."
         )
         with connect() as c:

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import {AssessmentPanel} from "./assessment-panel";
 import { api, download, stamp } from "./lib";
 type Row = Record<string, any>;
 const localTime = (value = new Date().toISOString()) => {
@@ -225,7 +226,8 @@ export function CaseWorkflows({
         </div>
       </div>
       <Status error={error} message={message} busy={busy} />
-      <div
+      {canReview && <AssessmentPanel cid={cid} kind="linkage" onChanged={onChanged} />}
+        <div
         className="workflow-tabs"
         role="group"
         aria-label="Evidence workflow sections"
@@ -1216,6 +1218,7 @@ export function EvidenceResolution({
               )
               .join("; ")}
       </p>
+      <AssessmentPanel cid={cid} text={notes} />
       <label>
         Resolution note
         <textarea

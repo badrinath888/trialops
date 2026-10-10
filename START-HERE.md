@@ -19,3 +19,5 @@ docker compose up -d --no-deps --wait api worker web
 The test script uses a separate Docker project and database at port 3002. The backup check restores into a uniquely named temporary database and removes only that verification database. API startup applies checksum-verified additive migrations; the worker waits for API health. Do not delete the database volume, replace `.env`/`.secrets`, or run `docker compose down -v` during an upgrade.
 
 A new installation can still use `bash install.sh` from this directory. Public deployment is separate and requires your own host/domain: [PUBLIC-DEPLOY.md](PUBLIC-DEPLOY.md). No public hosting or external messaging is enabled by this release.
+
+Connected wording/linkage/question workflows: [guide](CONNECTED-ASSESSMENTS.md), [verification](ASSESSMENT-VERIFICATION.md).

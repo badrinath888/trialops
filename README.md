@@ -155,3 +155,5 @@ Run `bash scripts/verify-backup.sh` to test a real pg_dump/pg_restore into a sep
 ## Readability and interaction
 
 The UI uses the selected Graphite & Copper theme. Body text and inputs are 16 pixels, secondary text is 15–16 pixels, and no visible UI text is below 15 pixels. Controls have a 44-pixel minimum height. The landing sample is interactive with keyboard-accessible tabs. Investigation feedback reflects actual queued/running states, not simulated progress. Motion is short and disabled when the browser requests reduced motion. See TEST-REPORT.md for current execution evidence.
+
+Connected wording/linkage/question workflows: [guide](CONNECTED-ASSESSMENTS.md), [verification](ASSESSMENT-VERIFICATION.md).

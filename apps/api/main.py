@@ -1149,3 +1149,6 @@ def export(a=Depends(actor)):
 from release_api import router as release_router
 
 app.include_router(release_router)
+
+from assessments import router as assessment_router
+app.include_router(assessment_router)

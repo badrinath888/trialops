@@ -1,0 +1,8 @@
+# Application-only rollback to 58cea0a; keep all databases and additive schema.
+services:
+  api:
+    image: trialops-release-api:pre-assessments-58cea0a
+  worker:
+    image: trialops-release-worker:pre-assessments-58cea0a
+  web:
+    image: trialops-release-web:pre-assessments-58cea0a

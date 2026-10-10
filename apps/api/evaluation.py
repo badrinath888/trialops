@@ -17,7 +17,12 @@ def dataset():
     return data
 
 
-def configuration(mode):
+def configuration(mode, suite="investigation"):
+    if suite == "assessments":
+        from assessment_evaluation import dataset as assessment_dataset
+        from assessments import config
+        data=assessment_dataset()
+        return {"mode":"ollama","suite":suite,"model":config("wording")["model"],"dataset_sha256":data["sha256"],"assessment_configuration":config("wording")}
     return {
         "mode": mode,
         "model": os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
@@ -32,6 +37,9 @@ def configuration(mode):
 
 
 def evaluate(config, heartbeat=lambda: None):
+    if config.get("suite") == "assessments":
+        from assessment_evaluation import evaluate as assess_evaluate
+        return assess_evaluate(config, heartbeat)
     from investigation import investigate_evidence
 
     data = dataset()

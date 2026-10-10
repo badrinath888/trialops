@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import {AssessmentDemo} from "./assessment-panel";
 import { api, stamp } from "./lib";
 type Row = Record<string, any>;
 const local = (value = new Date().toISOString()) => {
@@ -52,7 +53,7 @@ export function OverviewRelease({ me }: { me: Row }) {
   }, [load]);
   return (
     <>
-      {me.demo && <SampleWalkthrough />}
+      {me.demo && <><SampleWalkthrough /><AssessmentDemo /></>}
       <details className="panel">
         <summary>
           In-app follow-up reminders ·{" "}
@@ -669,6 +670,7 @@ function Reassessment({
 function EvaluationDashboard({ me }: { me: Row }) {
   const [data, setData] = useState<Row | null>(null),
     [mode, setMode] = useState(me.ai_mode || "procedure"),
+    [suite, setSuite] = useState("investigation"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [selected, setSelected] = useState(""),
@@ -699,16 +701,17 @@ function EvaluationDashboard({ me }: { me: Row }) {
         <p role="status">Loading evaluation dataset…</p>
       ) : (
         <>
-          <p>{data.dataset.description}</p>
+          <p>{suite==="assessments"?data.assessment_dataset.label_provenance:data.dataset.description}</p>
           <small>
-            Dataset {data.dataset.version} · {data.dataset.scenarios.length}{" "}
+            Dataset {suite==="assessments"?data.assessment_dataset.version:data.dataset.version} · {suite==="assessments"?data.assessment_dataset.scenarios.length:data.dataset.scenarios.length}{" "}
             versioned scenarios
           </small>
           <div className="form-grid">
+            <label>Evaluation suite<select value={suite} onChange={e=>{setSuite(e.target.value);if(e.target.value==="assessments")setMode("ollama")}}><option value="investigation">Existing investigation scenarios</option><option value="assessments">Connected assessments · independently labeled</option></select></label>
             <label>
               Evaluation mode
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
-                <option value="procedure">
+                <option value="procedure" disabled={suite==="assessments"}>
                   Deterministic procedure matching
                 </option>
                 <option value="ollama">Configured local Ollama model</option>
@@ -721,7 +724,7 @@ function EvaluationDashboard({ me }: { me: Row }) {
               setBusy(true);
               setError("");
               try {
-                await api("/evaluations", { id: crypto.randomUUID(), mode });
+                await api("/evaluations", { id: crypto.randomUUID(), mode, suite });
                 await load();
               } catch (e) {
                 setError((e as Error).message);
@@ -770,7 +773,7 @@ function EvaluationDashboard({ me }: { me: Row }) {
                       </div>
                     ))}
                   </div>
-                  <div
+                  {r.configuration.suite==="assessments"?<><p>{r.results.ground_truth_provenance}</p><p>{r.results.security_tests}</p><details><summary>Per-case labels, linkage and question results</summary><pre>{JSON.stringify(r.results.scenarios,null,2)}</pre></details></>:<div
                     className="data-table-wrap"
                     tabIndex={0}
                     role="region"
@@ -804,7 +807,7 @@ function EvaluationDashboard({ me }: { me: Row }) {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </div>}
                   <details>
                     <summary>Configuration and exact recorded results</summary>
                     <pre>{JSON.stringify(r.results, null, 2)}</pre>

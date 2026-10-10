@@ -2399,3 +2399,13 @@ input[type="checkbox"] { width:18px; height:18px; min-height:0; padding:0; margi
 .monitoring-visits h3 { margin-top:20px; }
 .walkthrough .actions { gap:10px; }
 @media(max-width:600px) { .reminder-choices { grid-template-columns:1fr; } .check-item { padding:12px; } .workflow-tabs button { flex:1 1 130px; } .evidence-workflow .section-heading .actions { width:100%; } .evidence-workflow .section-heading .actions>* { flex:1; } }
+
+.assessment-panel { margin:12px 0; }
+.assessment-content { padding:16px; border:1px solid var(--line); border-radius:8px; margin-top:12px; }
+.assessment-content fieldset { min-width:0; padding:12px; margin:16px 0; border:1px solid var(--line); }
+.assessment-content .check { align-items:flex-start; margin:12px 0; }
+.assessment-content .check span,.assessment-content article { min-width:0; overflow-wrap:anywhere; }
+.assessment-content small { display:block; margin-block:8px; }
+.assessment-content pre { max-width:100%; max-height:360px; overflow:auto; }
+.assessment-content blockquote { margin:12px 0; padding-left:12px; border-left:3px solid #98522e; overflow-wrap:anywhere; }
+.assessment-content article,.assessment-result { border-top:1px solid var(--line); padding-block:12px; }

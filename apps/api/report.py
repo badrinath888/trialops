@@ -447,9 +447,11 @@ def build_case_report(package):
         ("Human-confirmed related cases", "links"),
         ("Procedure reassessments", "reassessments"),
         ("Explicitly recorded human effort", "effort"),
+        ("Frozen selected-evidence assessments", "assessments"),
+        ("Assessment human decisions and request drafts", "assessment_decisions"),
         ("Case chronology and resolution evidence", "events"),
     ]:
-        section(title, package[key])
+        section(title, package.get(key, []))
 
     def footer(canvas, doc):
         canvas.saveState()

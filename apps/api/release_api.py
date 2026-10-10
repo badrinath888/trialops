@@ -1194,6 +1194,7 @@ def evaluations(a=Depends(actor)):
 
     return {
         "dataset": dataset(),
+        "assessment_dataset": __import__("assessment_evaluation").dataset(),
         "runs": query(
             "SELECT e.*,j.status,j.error,j.attempts FROM evaluation_runs e LEFT JOIN LATERAL (SELECT * FROM jobs WHERE workspace_id=e.workspace_id AND target_id=e.id::text AND kind='evaluate' ORDER BY created_at DESC,id DESC LIMIT 1) j ON true WHERE e.workspace_id=%s ORDER BY e.created_at DESC LIMIT 50",
             (a["workspace_id"],),
@@ -1222,8 +1223,12 @@ def enqueue_evaluation(body: EvaluationCreate, a=Depends(actor)):
             (a["workspace_id"],),
         ).fetchone():
             raise HTTPException(409, "Wait for this workspace evaluation to finish.")
-        config = configuration(body.mode)
-        data = dataset()
+        if body.suite == "assessments" and body.mode != "ollama":
+            raise HTTPException(422,"Semantic assessment evaluation requires local Ollama")
+        if c.execute("SELECT count(*) AS n FROM jobs WHERE workspace_id=%s AND kind IN ('assess','evaluate') AND status IN ('queued','running')",(a["workspace_id"],)).fetchone()["n"] >= 2:
+            raise HTTPException(429,"Workspace assessment workload is full")
+        config = configuration(body.mode, body.suite)
+        data = __import__("assessment_evaluation").dataset() if body.suite == "assessments" else dataset()
         c.execute(
             "INSERT INTO evaluation_runs(workspace_id,id,dataset_version,model,configuration,actor_id) VALUES(%s,%s,%s,%s,%s,%s)",
             (
@@ -1292,6 +1297,8 @@ def retry_evaluation(rid: UUID, a=Depends(actor)):
             raise HTTPException(404, "Evaluation not found.")
         if item["results"] is not None:
             raise HTTPException(409, "Evaluation is complete. Create a new run.")
+        if c.execute("SELECT count(*) AS n FROM jobs WHERE workspace_id=%s AND kind IN ('assess','evaluate') AND status IN ('queued','running')",(a["workspace_id"],)).fetchone()["n"] >= 2:
+            raise HTTPException(429,"Workspace assessment workload is full")
         if c.execute(
             "SELECT 1 FROM jobs WHERE workspace_id=%s AND kind='evaluate' AND status IN ('queued','running')",
             (a["workspace_id"],),
@@ -1317,6 +1324,8 @@ def case_package(a, cid):
             "comparisons": "snapshot_comparisons",
             "reassessments": "procedure_reassessments",
             "effort": "human_effort",
+            "assessments": "case_assessments",
+            "assessment_decisions": "assessment_decisions",
         }
         package = {
             key: c.execute(
@@ -1325,6 +1334,12 @@ def case_package(a, cid):
             ).fetchall()
             for key, table in tables.items()
         }
+        from assessments import view as assessment_view
+        if a["role"] in ("owner", "reviewer"):
+            package["assessments"] = [assessment_view(c,a,r) for r in package["assessments"]]
+        else:
+            package["assessments"] = []
+            package["assessment_decisions"] = []
         package["case"] = item
         package["events"].sort(key=lambda e: e["id"])
         package["runs"].sort(key=lambda r: r["created_at"])

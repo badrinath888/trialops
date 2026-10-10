@@ -1,4 +1,5 @@
 "use client";
+import {AssessmentPanel} from "../../assessment-panel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -1303,6 +1304,7 @@ function RunView({
                       placeholder="Add your reason for approving or rejecting these checks."
                     />
                   </label>
+                  <AssessmentPanel cid={run.case_id} text={notes} />
                   <div className="actions">
                     <button
                       disabled={
