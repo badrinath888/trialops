@@ -1,7 +1,8 @@
 # Five-feature checkpoint — 2026-10-10
-- HEAD cc838b7; previous fourteen features and assessments preserved.
+- Release implementation commit3276aa8 (base cc838b7); current HEAD is the
+  checkpoint-only follow-up. Previous fourteen features/assessments preserved.
 - Scope: FIVE-FEATURE-SPEC.md; instructions: AGENTS.md.
-- Uncommitted five-feature API/UI/schema/tests/config/docs; no unrelated edits found.
+- All verified source/tests/config/docs committed; no unrelated edits found.
 ## Relevant paths
 - apps/api/account_access.py: hashed purpose-bound tokens, generic recovery,
   bounded SMTP, verification, reset and complete session revocation.
@@ -40,7 +41,7 @@
   compare both original permanent-record fingerprints via /private/tmp/five-invariants.py.
 - Fresh restore-verified live backup, retain current image rollback tags, migrate
   and update only tested api/worker/web; health/live workflow/data checks.
-- Final documentation complete; commit source only, excluding generated/private files.
+- Final source commit3276aa8 excludes generated/private files; documentation complete.
 ## Commands (project root)
 - Test prefix: docker compose -p trialops-release-test -f compose.yaml -f compose.release-test.yaml
 - Test checks: prefix exec -T api python -m unittest discover -s tests -p 'test_*.py'
