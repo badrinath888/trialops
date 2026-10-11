@@ -1164,6 +1164,9 @@ app.include_router(release_router)
 from assessments import router as assessment_router
 app.include_router(assessment_router)
 
+from case_watch import router as watch_router
+app.include_router(watch_router)
+
 from account_access import router as account_router
 from five_features import router as five_router
 app.include_router(account_router)

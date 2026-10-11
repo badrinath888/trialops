@@ -450,6 +450,7 @@ def build_case_report(package):
         ("Frozen selected-evidence assessments", "assessments"),
         ("Assessment human decisions and request drafts", "assessment_decisions"),
         ("External responses — unverified link holder, human review required", "external_responses"),
+        ("Case watch updates — deterministic change detection; any model-assisted questions are labelled; nothing confirmed or sent", "watch_updates"),
         ("Case handover history", "handovers"),
         ("Blockers and waiting history", "blockers"),
         ("Elapsed blocked time (not human effort)", "waiting_time"),

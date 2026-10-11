@@ -1,0 +1,9 @@
+# Restore the exact api/worker/web images running before Case watch. Migration 008 is additive and left in place;
+# older code ignores the case_watches tables. Never reset or restore databases for a code rollback.
+services:
+  api:
+    image: trialops-release-api:pre-watch-e3c4e69
+  worker:
+    image: trialops-release-worker:pre-watch-e3c4e69
+  web:
+    image: trialops-release-web:pre-watch-e3c4e69

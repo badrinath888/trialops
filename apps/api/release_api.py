@@ -1347,6 +1347,7 @@ def case_package(a, cid):
             "handovers": "case_handovers",
             "blockers": "case_blockers",
             "external_responses": "external_responses",
+            "watch_updates": "case_watch_updates",
         }
         package = {
             key: c.execute(
@@ -1356,6 +1357,9 @@ def case_package(a, cid):
             for key, table in tables.items()
         }
         from assessments import view as assessment_view
+        if a["role"] not in ("owner", "reviewer"):
+            package["watch_updates"] = []
+        package["watch"] = c.execute("SELECT status,selected_evidence,pause_reason,updated_at FROM case_watches WHERE workspace_id=%s AND case_id=%s", (w, cid)).fetchone() if a["role"] in ("owner", "reviewer") else None
         if a["role"] in ("owner", "reviewer"):
             package["assessments"] = [assessment_view(c,a,r) for r in package["assessments"]]
         else:

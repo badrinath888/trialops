@@ -2,6 +2,7 @@
 import {MyWork,NextStep,ResponsePolicy} from "../../user-workflow-panels";
 import {WaitingQueue,SupportDirectory,EmailVerification} from "../../five-feature-panels";
 import {AssessmentPanel} from "../../assessment-panel";
+import {CaseWatch} from "../../case-watch";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -790,6 +791,7 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
         </p>
       )}
       <NextStep item={c} onInvestigate={investigate} refreshKey={String(data.job?.status)+String(data.runs.length)+String(c.updated_at)}/>
+      <CaseWatch cid={c.id} refreshKey={String(workflowRefresh)}/>
       <div id="case-investigate" className="case-actions panel">
         <div>
           <h3>Investigate this issue</h3>

@@ -37,6 +37,10 @@ def claim():
 def process(job):
     started = time.monotonic()
     w = job["workspace_id"]
+    if job["kind"] == "watch":
+        from case_watch import process_watch
+        process_watch(job)
+        return
     if job["kind"] == "assess":
         from assessments import process_assessment
         process_assessment(job)
@@ -240,6 +244,8 @@ def run_once():
             if job["kind"] == "evaluate"
             else "Assessment unavailable or failed. Check local Ollama, evidence and reviewer permissions; retry within the limit. No external action was executed."
             if job["kind"] == "assess"
+            else "Case watch update failed. Retry from the case; no evidence was confirmed and nothing was sent."
+            if job["kind"] == "watch"
             else "Embedding failed. Text search remains available. Check the model and save the procedure again to retry."
         )
         with connect() as c:
@@ -270,6 +276,7 @@ def cleanup():
 if __name__ == "__main__":
     last = 0
     last_reminders = 0
+    last_watch = 0
     while True:
         try:
             Path("/tmp/trialops-worker-heartbeat").touch()
@@ -281,6 +288,11 @@ if __name__ == "__main__":
 
                 scan_reminders()
                 last_reminders = time.monotonic()
+            if time.monotonic() - last_watch > 10:
+                from case_watch import scan_watches
+
+                scan_watches()
+                last_watch = time.monotonic()
             if not run_once():
                 time.sleep(1)
         except Exception:

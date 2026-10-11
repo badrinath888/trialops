@@ -37,6 +37,12 @@
   design-check 29 + visual-review 54/9 interactions pass; targeted Overview check passed
   (1440/390, links, zero state, keyboard focus, no h-scroll). Web-only deploy to 3001;
   live DB fingerprint unchanged; api/worker/db untouched. Nothing remaining.
+## Case watch agent (2026-10-11) — DONE, deployed to 3001
+- 008_case_watch.sql, apps/api/case_watch.py, worker dispatch/scan, export in release_api.py/report.py, apps/web/app/case-watch.tsx.
+- Verified: unit 66, case_watch_integration 10 groups, watch-check journey, design/visual/user-workflow/release browser checks.
+  Details/limits in CASE-WATCH-VERIFICATION.md (local model output was rejected by validator in the sample run; deterministic path ok).
+- Backup restore-verified before migration; live DB fingerprint unchanged; rollback: compose.case-watch-rollback.yaml (api/worker/web).
+- Remaining: none required. Optional: tune model prompt so question output passes duplicate-gap validation.
 ## Commands (project root)
 - Test: docker compose -p trialops-release-test -f compose.yaml -f compose.release-test.yaml
   build web; same prefix up -d --no-deps --no-build --wait web.
@@ -44,5 +50,5 @@
   CHROMIUM_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   node tests/browser/visual-review.cjs (module resolved relative to test script).
 - Live: docker compose up -d --no-deps --no-build --wait web after tested image tag.
-- No migrations required; retain existing verified backups and old web image for rollback.
+- Migrations apply at api start (python migrate.py); backup first: bash scripts/verify-backup.sh. Keep old images for rollback.
 - Preserve all DBs/accounts/uploads/private files; never reset or send externally.
