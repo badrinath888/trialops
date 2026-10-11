@@ -45,7 +45,6 @@ export default function SignIn() {
       <section className="auth-form-area">
       <div className="auth-card">
         <p className="eyebrow">YOUR OPERATIONS WORKSPACE</p>
-        <Link href="/account-access">Forgot password?</Link>
         <h1>{mode === "login" ? "Welcome back." : "Create your workspace."}</h1>
         <p>
           {mode === "login"
@@ -128,7 +127,8 @@ export default function SignIn() {
                 : "Create workspace"}
           </button>
         </form>
-        <details className="auth-policy"><summary>Account & data information</summary><p className="subtle">Email identifies your account and is not verified. Email password recovery is not available. Use non-patient operational information. Read the <Link href="/guide#data-policy">data policy</Link> before uploading.</p></details>
+        <p className="auth-recovery"><Link className="text-link" href="/account-access">Forgot password?</Link></p>
+        <details className="auth-policy"><summary>Account & data information</summary><p className="subtle">Email identifies your account. Verify it from Settings after signing in. Password recovery requires configured email delivery. Use non-patient operational information. Read the <Link href="/guide#data-policy">data policy</Link> before uploading.</p></details>
         <div className="auth-links"><Link href="/" className="text-link">← Back to home</Link><Link href="/guide" className="text-link">Product guide</Link></div>
       </div>
       </section>

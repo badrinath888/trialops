@@ -328,7 +328,6 @@ function Overview({ me }: { me: Row }) {
           Submit an issue
         </Link>
       </Heading>
-      <MyWork />
       <ErrorBox error={error} />
       <div className="overview-metrics">
         {[
@@ -342,6 +341,7 @@ function Overview({ me }: { me: Row }) {
           </div>
         ))}
       </div>
+      <MyWork />
       <section className="panel attention-section" aria-label="Attention queue">
         <div className="section-heading">
           <h2>Needs your attention</h2>
@@ -2988,8 +2988,8 @@ function Settings({ me }: { me: Row }) {
             <p>
               Owners can export workspace records. Your deployment operator
               manages retention, backups, and deletion. Email identifies your
-              account and is not verified. Email password recovery is
-              unavailable.
+              account. Email verification and password recovery require
+              configured email delivery.
             </p>
           </details>
           <Link className="button outline" href="/guide#data-policy">

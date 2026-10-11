@@ -1,0 +1,4 @@
+# Restore only the exact web image running before the visual refinement.
+services:
+  web:
+    image: trialops-release-web:pre-visual-9fe1132
