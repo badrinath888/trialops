@@ -2413,3 +2413,5 @@ input[type="checkbox"] { width:18px; height:18px; min-height:0; padding:0; margi
 /* Compact continuity panels reuse existing graphite/copper controls. */
 .panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
 .panel details{margin-block:10px}.panel summary{cursor:pointer;overflow-wrap:anywhere}
+
+.work-item{padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.work-item p{margin:6px 0}.external-text{white-space:pre-wrap;overflow-wrap:anywhere}.request-portal{margin:12px 0}.next-step small{display:block;margin-top:10px}.my-work details{margin-top:12px}

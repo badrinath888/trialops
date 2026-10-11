@@ -1,0 +1,8 @@
+# Application-only rollback; retain additive schema, responses and all volumes.
+services:
+  api:
+    image: trialops-release-api:pre-user-workflow-b7f886c
+  worker:
+    image: trialops-release-worker:pre-user-workflow-b7f886c
+  web:
+    image: trialops-release-web:pre-user-workflow-b7f886c

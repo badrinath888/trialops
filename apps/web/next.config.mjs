@@ -20,6 +20,8 @@ const config = {
           },
         ],
       },
+      { source: "/respond", headers: [{key:"Referrer-Policy",value:"no-referrer"},{key:"Cache-Control",value:"no-store"}] },
+      { source: "/api/external-response", headers: [{key:"Referrer-Policy",value:"no-referrer"},{key:"Cache-Control",value:"no-store"}] },
     ];
   },
 };

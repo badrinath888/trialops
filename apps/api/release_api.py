@@ -1346,6 +1346,7 @@ def case_package(a, cid):
             "assessment_decisions": "assessment_decisions",
             "handovers": "case_handovers",
             "blockers": "case_blockers",
+            "external_responses": "external_responses",
         }
         package = {
             key: c.execute(

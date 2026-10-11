@@ -30,6 +30,7 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
           : typeof data.detail?.message === "string" ? data.detail.message : "Request failed",
       r.status,
     );
+  if(body !== undefined && typeof window !== "undefined" && !path.endsWith("/next-step/open")) window.dispatchEvent(new Event("trialops-workflow-changed"));
   return data;
 }
 export function stamp(v: string) {

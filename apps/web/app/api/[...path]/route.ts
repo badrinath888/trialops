@@ -9,7 +9,7 @@ async function proxy(request: Request) {
   const incoming = new URL(request.url),
     path = incoming.pathname.slice(4);
   if (
-    !/^\/(auth|intake|catalog|dashboard|cases|jobs|runs|knowledge|operations|roi|feedback|members|invitations|export|health|metrics|policies|visits|notifications|notification-preferences|evaluations|walkthrough|assessment-demo|contacts|waiting-queue)(\/|$)/.test(
+    !/^\/(auth|intake|catalog|dashboard|cases|jobs|runs|knowledge|operations|roi|feedback|members|invitations|export|health|metrics|policies|visits|notifications|notification-preferences|evaluations|walkthrough|assessment-demo|contacts|waiting-queue|my-work|external-response)(\/|$)/.test(
       path,
     )
   )
@@ -44,6 +44,7 @@ async function proxy(request: Request) {
         headers: {
           "Content-Type":
             request.headers.get("content-type") || "application/json",
+          "X-Response-Token": path === "/external-response" ? request.headers.get("x-response-token") || "" : "",
           Cookie: request.headers.get("cookie") || "",
           "X-Internal-Key": internalKey(),
           "X-Client-IP":

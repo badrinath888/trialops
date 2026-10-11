@@ -25,7 +25,7 @@ def scan_reminders():
             if not scan:
                 continue
             members = c.execute(
-                'SELECT m.user_id,coalesce(p.enabled,true) AS enabled,coalesce(p.kinds,\'["request","check","reassessment","deadline"]\'::jsonb) AS kinds FROM memberships m LEFT JOIN notification_preferences p ON (p.workspace_id,p.user_id)=(m.workspace_id,m.user_id) WHERE m.workspace_id=%s',
+                'SELECT m.user_id,m.role,coalesce(p.enabled,true) AS enabled,coalesce(p.kinds,\'["request","check","reassessment","deadline"]\'::jsonb) AS kinds FROM memberships m LEFT JOIN notification_preferences p ON (p.workspace_id,p.user_id)=(m.workspace_id,m.user_id) WHERE m.workspace_id=%s',
                 (w["id"],),
             ).fetchall()
             cases = c.execute(
@@ -120,10 +120,16 @@ def scan_reminders():
                             open_cases[r["case_id"]]["owner_id"],
                         )
                     )
+            for r in c.execute("SELECT e.id,e.case_id,r.owner_id,r.title FROM external_responses e JOIN information_requests r ON r.workspace_id=e.workspace_id AND r.id=e.request_id WHERE e.workspace_id=%s AND e.status='pending' AND r.status='requested'",(w['id'],)).fetchall():
+                if r['case_id'] in open_cases:
+                    owner=r['owner_id'] or open_cases[r['case_id']]['owner_id']
+                    if not any(m['user_id']==owner and m['role'] in ('owner','reviewer') for m in members):owner=None
+                    alerts.append(('request',r['case_id'],'External response awaits review: '+r['title'],'external-response:'+str(r['id']),owner))
             for kind, cid, title, dedupe, owner in alerts:
                 for m in members:
                     if (
-                        not m["enabled"]
+                        (dedupe.startswith("external-response:") and m["role"] not in ("owner","reviewer"))
+                        or not m["enabled"]
                         or kind not in m["kinds"]
                         or (owner and m["user_id"] != owner)
                     ):

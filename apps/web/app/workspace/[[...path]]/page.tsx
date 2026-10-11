@@ -1,4 +1,5 @@
 "use client";
+import {MyWork,NextStep,ResponsePolicy} from "../../user-workflow-panels";
 import {WaitingQueue,SupportDirectory,EmailVerification} from "../../five-feature-panels";
 import {AssessmentPanel} from "../../assessment-panel";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -290,7 +291,7 @@ export default function Workspace() {
           ) : view === "feedback" ? (
             <Feedback me={me} />
           ) : view === "settings" ? (
-            <><Settings me={me} /><EmailVerification me={me}/><SupportDirectory me={me}/></>
+            <><Settings me={me} /><EmailVerification me={me}/><ResponsePolicy me={me}/><SupportDirectory me={me}/></>
           ) : (
             <Empty title="Page not found">
               <Link href="/workspace">Return to overview</Link>
@@ -327,6 +328,7 @@ function Overview({ me }: { me: Row }) {
           Submit an issue
         </Link>
       </Heading>
+      <MyWork />
       <ErrorBox error={error} />
       <div className="overview-metrics">
         {[
@@ -788,7 +790,8 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
           {message}
         </p>
       )}
-      <div className="case-actions panel">
+      <NextStep item={c} onInvestigate={investigate} refreshKey={String(data.job?.status)+String(data.runs.length)+String(c.updated_at)}/>
+      <div id="case-investigate" className="case-actions panel">
         <div>
           <h3>Investigate this issue</h3>
           <p>
@@ -817,7 +820,7 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
         </p>
       )}
       <div className="detail-grid">
-        <section>
+        <section id="case-findings" tabIndex={-1}>
           {data.runs.length > 0 && (
             <label className="run-selector">
               Saved investigation
@@ -853,7 +856,7 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
               void load();
             }}
           />
-          <section className="panel resolution-panel">
+          <section id="case-resolution" tabIndex={-1} className="panel resolution-panel">
             <div className="section-heading">
               <h2>Case status</h2>
               <Badge value={c.status} />

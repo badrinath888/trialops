@@ -114,3 +114,13 @@ Focused browser passed18 states on3002 and14 on3001. Original permanent-record
 fingerprints match both databases; original private-file fingerprints match.
 No external email configured on live. Actual checks/limits:
 FIVE-FEATURE-VERIFICATION.md; exact working state: DEV-CHECKPOINT.md.
+
+## Personal-workflow extension — 2026-10-10
+Implemented My work today, deterministic case Next step, and restricted text-only
+external responses. Existing records, permissions, reminders, human approval and
+separate resolution preserved. Scope: USER-WORKFLOW-SPEC.md; configuration/security/
+rollback: USER-WORKFLOW-RELEASE.md; actual checks: USER-WORKFLOW-VERIFICATION.md.
+Tested on preserved3002, including populated18-state desktop/narrow journey and
+prior16-state regression. Fresh live backup restore verified before additive007;
+tested application services updated locally3001; databases/volumes retained.
+Final exact deployment/verification state: DEV-CHECKPOINT.md.

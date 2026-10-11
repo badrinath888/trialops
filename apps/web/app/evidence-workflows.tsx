@@ -1,4 +1,5 @@
 "use client";
+import {RequestPortal} from "./user-workflow-panels";
 import {ContinuityPanel,ContactSelect} from "./five-feature-panels";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -111,6 +112,7 @@ export function CaseWorkflows({
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
+  useEffect(()=>{const open=(e:Event)=>{const d=(e as CustomEvent).detail;if(d.cid===cid&&['checks','requests'].includes(d.action))setTab(d.action)};window.addEventListener('trialops-open-action',open);const initial=new URLSearchParams(location.search).get('action');if(initial&&['checks','requests'].includes(initial))setTab(initial);return()=>window.removeEventListener('trialops-open-action',open)},[cid]);
   const [title, setTitle] = useState(""),
     [requested, setRequested] = useState(""),
     [requestOwner, setRequestOwner] = useState(""),
@@ -196,7 +198,7 @@ export function CaseWorkflows({
   }
   return (
     <section
-      className="panel evidence-workflow"
+      id="case-workflow" tabIndex={-1} className="panel evidence-workflow"
       aria-label="Case evidence workflow"
     >
       <div className="section-heading">
@@ -611,6 +613,8 @@ export function CaseWorkflows({
                   key={r.id + ":" + r.version}
                   request={r}
                   caseItem={item}
+                  me={me}
+                  onPortalChanged={()=>{setMessage("External response workflow updated. Evidence verification and resolution remain separate.");void load();onChanged()}}
                   evidence={data.evidence}
                   members={members}
                   busy={busy}
@@ -996,6 +1000,8 @@ export function CaseWorkflows({
 function RequestEditor({
   request: r,
   caseItem,
+  me,
+  onPortalChanged,
   evidence,
   members,
   busy,
@@ -1004,6 +1010,8 @@ function RequestEditor({
 }: {
   request: Row;
   caseItem: Row;
+  me: Row;
+  onPortalChanged:()=>void;
   evidence: Row[];
   members: Row[];
   busy: boolean;
@@ -1044,6 +1052,7 @@ function RequestEditor({
         </button>
       </div>
       {copyMessage && <p role="status">{copyMessage}</p>}
+      <RequestPortal item={caseItem} request={r} me={me} onChanged={onPortalChanged}/>
       <ContactSelect item={caseItem} value={contactId} onChange={setContactId}/>
       {r.status==="draft"&&<label>Reason for separate evidence request<textarea maxLength={2000} value={overrideReason} onChange={e=>setOverrideReason(e.target.value)}/></label>}
       <details>
@@ -1148,7 +1157,8 @@ function RequestEditor({
         <p key={n}>
           {x.text}
           <small>
-            {x.actor_name} · {stamp(x.recorded_at)}
+            {x.attribution || x.actor_name || "Recorded workspace response"} · {stamp(x.recorded_at)}
+            {x.accepted_for_consideration && <> · accepted for consideration by {x.reviewer_name}; truth not established</>}
           </small>
         </p>
       ))}

@@ -1133,6 +1133,7 @@ def export(a=Depends(actor)):
             table: query(f"SELECT * FROM {table} WHERE workspace_id=%s", (w,))
             for table in (
                 "workspace_policies",
+                "external_responses",
                 "case_handovers",
                 "case_blockers",
                 "support_contacts",
@@ -1167,3 +1168,6 @@ from account_access import router as account_router
 from five_features import router as five_router
 app.include_router(account_router)
 app.include_router(five_router)
+
+from user_workflow import router as user_workflow_router
+app.include_router(user_workflow_router)

@@ -159,3 +159,5 @@ The UI uses the selected Graphite & Copper theme. Body text and inputs are 16 pi
 Connected wording/linkage/question workflows: [guide](CONNECTED-ASSESSMENTS.md), [verification](ASSESSMENT-VERIFICATION.md).
 
 Five-feature local release: [locations, configuration and rollback](FIVE-FEATURE-RELEASE.md) · [verification](FIVE-FEATURE-VERIFICATION.md).
+
+Personal workflow release: [locations, security and rollback](USER-WORKFLOW-RELEASE.md) · [actual verification](USER-WORKFLOW-VERIFICATION.md).
