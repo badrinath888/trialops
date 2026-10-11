@@ -66,6 +66,20 @@ inference changes. Corrected stale recovery wording in sign-in and Settings.
 - Screenshots, generated exports, raw logs and preservation evidence stay in
   ignored `artifacts/ui-refinement` or private temporary files.
 
+## Overview summary strip follow-up (2026-10-11)
+
+- Frontend-only: counts in a divided graphite strip; non-zero counts link to
+  /workspace/cases (existing ?view=review/overdue values); zero shows "None".
+- visual-review first failed (overview link text 14px, minimum 15px); corrected and
+  test web rebuilt. Then design-check 29 states and visual-review 54 pages /
+  9 interactions passed with no issues.
+- Targeted check at 1440 and 390 (zero and mocked non-zero dashboard): links and
+  hrefs, zero state, Enter navigation, visible 2px focus ring, no horizontal scroll,
+  strip above My work. Zero tiles are intentionally not focusable.
+- Web-only deploy to 3001; live DB fingerprint equal before/after, api/worker/db
+  containers unchanged. Live check: 200 and new bundle only; suites not run live
+  (they create sample workspaces). Rollback image unchanged from above.
+
 ## Coverage limits
 
 Chromium at desktop/narrow widths, plus short-height sidebar and keyboard checks;

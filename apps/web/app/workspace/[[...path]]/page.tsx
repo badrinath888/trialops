@@ -330,16 +330,15 @@ function Overview({ me }: { me: Row }) {
       </Heading>
       <ErrorBox error={error} />
       <div className="overview-metrics">
-        {[
-          ["Open cases", data?.open_cases],
-          ["Awaiting review", data?.attention?.reviews?.total],
-          ["Overdue", data?.attention?.overdue?.total],
-        ].map(([label, value]) => (
-          <div key={label as string}>
-            <span>{label}</span>
-            <strong>{value ?? "—"}</strong>
-          </div>
-        ))}
+        {([
+          ["Open cases", data?.open_cases, "", "View", false],
+          ["Awaiting review", data?.attention?.reviews?.total, "?view=review", "Review", true],
+          ["Overdue", data?.attention?.overdue?.total, "?view=overdue", "View", true],
+        ] as [string, number | undefined, string, string, boolean][]).map(([label, value, query, cta, urgent]) => {
+          const body = <><span>{label}</span><strong>{value ?? "—"}</strong></>;
+          if (!value) return <div key={label} className="metric quiet">{body}<em>{value === 0 ? "None" : ""}</em></div>;
+          return <Link key={label} className={"metric" + (urgent ? " urgent" : "")} href={"/workspace/cases" + query}>{body}<em>{cta} →</em></Link>;
+        })}
       </div>
       <MyWork />
       <section className="panel attention-section" aria-label="Attention queue">

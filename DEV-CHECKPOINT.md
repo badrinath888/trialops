@@ -31,6 +31,12 @@
 - Rollback image trialops-release-web:pre-visual-9fe1132 verified. No earlier full DB
   baseline existed in /private/tmp; preservation claimed only from pre-deploy fingerprint.
 - Remaining: none for this UI release. Rollback: compose.ui-rollback.yaml (web only).
+- 2026-10-11 DONE: Overview band restyled (divided graphite strip). Non-zero counts link to
+  /workspace/cases (?view=review|overdue); review/overdue >0 get copper underline; zero shows
+  "None" (not a link). visual-review caught 14px link text; fixed to 15px, test web rebuilt.
+  design-check 29 + visual-review 54/9 interactions pass; targeted Overview check passed
+  (1440/390, links, zero state, keyboard focus, no h-scroll). Web-only deploy to 3001;
+  live DB fingerprint unchanged; api/worker/db untouched. Nothing remaining.
 ## Commands (project root)
 - Test: docker compose -p trialops-release-test -f compose.yaml -f compose.release-test.yaml
   build web; same prefix up -d --no-deps --no-build --wait web.
