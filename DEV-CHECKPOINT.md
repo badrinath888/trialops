@@ -1,5 +1,6 @@
 # User-workflow release checkpoint — 2026-10-10
-- Base b7f886c; verified implementation/source commit follows this checkpoint.
+- Verified release implementation c8cc0d6 (base b7f886c); HEAD adds this checkpoint.
+- All verified source committed; no unrelated or pending implementation edits.
 - Scope USER-WORKFLOW-SPEC.md; rules AGENTS.md; no unrelated edits found.
 - All three requested capabilities implemented and deployed locally3001.
 ## Relevant paths
@@ -40,7 +41,7 @@
 - Exact disposable browser samples cleaned; both original full-row DB fingerprints
   and private environment/secret/upload file hashes match. Volumes/backups retained.
 ## Remaining / next action
-- NEXT: commit verified source/docs/tests only, then report completed release.
+- NEXT: none; implementation, verification, local deployment and delivery complete.
 - No incomplete implementation or blocked work. Text-only bearer links do not
   verify identity/truth; GET budgets are per process; reminders follow scan cadence.
 - Queue caps, volatile drafts, Chromium/two-width coverage limits documented.
