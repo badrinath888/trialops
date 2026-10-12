@@ -37,4 +37,31 @@ class WatchRules(unittest.TestCase):
   with self.assertRaises(Exception):WatchSettings(status='active',evidence_ids=['a']*11)
   with self.assertRaises(Exception):WatchSettings(status='resolve')
   with self.assertRaises(Exception):WatchSettings(status='active',auto_send=True)
+class QuestionContract(unittest.TestCase):
+ def src(self):return {'id':'snapshot:s:document_processing:PROC-1','kind':'document_processing','version':'v','observed_at':'2026-10-11T10:00:00+00:00','fields':{'id':'PROC-1','study_id':'S','site_id':'T','status':'pending'}}
+ def test_request_caps_questions_to_supplied_gaps_and_states_the_rule(self):
+  import assessments as A,io,json as j
+  seen={}
+  class R:
+   def __enter__(s):return s
+   def __exit__(s,*a):return False
+   def read(s,n=-1):return j.dumps({'message':{'content':'{"questions":[]}'}}).encode()
+  def fake(req,timeout=0):seen.update(j.loads(req.data));return R()
+  old=A.urllib.request.urlopen;A.urllib.request.urlopen=fake
+  try:
+   for gaps,cap in ([{'id':'g1'}],1),([{'id':'g1'},{'id':'g2'}],2),([{'id':str(i)} for i in range(5)],3):
+    A.model_call('questions',{'selected_evidence':[self.src()],'gaps':gaps},A.config('questions'))
+    self.assertEqual(seen['format']['properties']['questions']['maxItems'],cap)
+    self.assertEqual(seen['format']['$defs']['Question']['properties']['gap_id']['enum'],[g['id'] for g in gaps])
+   self.assertIn('Use each gap ID at most once',seen['messages'][0]['content'])
+  finally:A.urllib.request.urlopen=old
+ def test_strict_validation_still_rejects_duplicate_and_invented_gaps(self):
+  import assessments as A
+  q=lambda g:{'gap_id':g,'question':'What is the current receipt status?','uncertainty':'Not verified yet','citations':[]}
+  ctx={'case':{'title':'t','description':''},'checks':[],'requests':[]}
+  for qs in ([q('current_status'),q('current_status')],[q('made_up')]):
+   with self.assertRaises(ValueError):A.assess('questions','',[self.src()],ctx,A.config('questions'),call=lambda *a:{'questions':qs})
+ def test_questions_config_version_changed_only_for_questions(self):
+  import assessments as A
+  self.assertEqual((A.config('questions')['version'],A.config('wording')['version']),('semantic-6','semantic-5'))
 if __name__=='__main__':unittest.main()

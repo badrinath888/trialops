@@ -42,7 +42,8 @@
 - Verified: unit 66, case_watch_integration 10 groups, watch-check journey, design/visual/user-workflow/release browser checks.
   Details/limits in CASE-WATCH-VERIFICATION.md (local model output was rejected by validator in the sample run; deterministic path ok).
 - Backup restore-verified before migration; live DB fingerprint unchanged; rollback: compose.case-watch-rollback.yaml (api/worker/web).
-- Remaining: none required. Optional: tune model prompt so question output passes duplicate-gap validation.
+- Real-model follow-up DONE: prompt/schema contract fixed (one question per gap), validation unchanged; see CASE-WATCH-VERIFICATION.md. api/worker redeployed; rollback tag pre-model-contract-0e96415.
+- Remaining: none required. Real-model checks: docker exec test-api python /app/tests/real_model_watch_check.py.
 ## Commands (project root)
 - Test: docker compose -p trialops-release-test -f compose.yaml -f compose.release-test.yaml
   build web; same prefix up -d --no-deps --no-build --wait web.
