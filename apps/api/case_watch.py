@@ -125,7 +125,7 @@ def build(c, w, case, ctx, catalog, changes, cur):
 
 SAFE_REASONS = frozenset({  # fixed validator messages only; anything else (e.g. text that may echo model/record content) is reduced to a category
     'Forged or unavailable citation/record field', 'Forged passage reference', 'Invented identifier in model output',
-    'Invented or changed documented threshold', 'Invented or unsupported timestamp in model output',
+    'Invented or changed documented threshold','Elapsed time stated as an observation', 'Invented or unsupported timestamp in model output',
     'Resolution claim or instruction in model output', 'Confidence percentages are not permitted',
     'Invented or duplicate uncertainty gap', 'Model response too large',
     'Selected input exceeds 20 KB. Select fewer relevant evidence passages.', 'Local Ollama endpoint unavailable or not permitted'})

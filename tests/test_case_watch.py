@@ -113,4 +113,19 @@ class EvidenceBoundary(unittest.TestCase):
   body={'changes':['c'],'uncertain':[],'next_action':'n','refs':[],'model':{}}
   def bad(*a):raise ValueError('Invented identifier in model output')
   b=add_model(body,([],{}),bad);self.assertEqual(b['model']['failure']['reason'],'Invented identifier in model output');self.assertEqual(b['model']['status'],'unavailable')
+ def test_procedure_text_describes_rules_but_never_authorizes_records(self):
+  from assessments import validate_text
+  src=self.sources();src[1]['fields']['content']+=' Example: UPLOAD-777 and SYNC-888 failed; DOC-555 is the usual case.'
+  for t in ('Which receipt belongs to UPLOAD-777?','Is SYNC-888 linked to DOC-1?'):
+   with self.assertRaises(ValueError) as c:validate_text(t,src)
+   self.assertEqual(str(c.exception),'Invented identifier in model output')
+  validate_text('The procedure says escalate after 15 minutes.',src)  # rule quoted as a rule
+  validate_text('Has the upload been pending for more than 15 minutes?',src)  # question against the rule
+ def test_documented_threshold_is_not_an_observed_elapsed_time(self):
+  for t in ('The upload has been pending for 15 minutes.','It was stuck for the past 15 minutes.','Uploaded 15 minutes ago.','15 minutes have passed.'):self.bad(t,'Elapsed time stated as an observation')
+  self.good('Escalate after 15 minutes if the receipt is missing.')
+ def test_human_entered_case_text_is_not_evidence(self):
+  from assessments import validate_text
+  src=self.sources()  # case title/description are not sources: identifiers there never authorize output
+  with self.assertRaises(ValueError):validate_text('Is this the DOC-4242 named in the case title?',src)
 if __name__=='__main__':unittest.main()

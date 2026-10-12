@@ -100,3 +100,27 @@ api and worker only redeployed to 3001 (no migration, web/db untouched, live fin
 ## Follow-up deployment (evidence boundary)
 api, worker and web redeployed to 3001 (no migration; DB container untouched; live fingerprint unchanged). Rollback images
 `trialops-release-{api,worker,web}:pre-boundary-e9eee72`. Live model path not exercised (writes data); live checks: 200, watch API 401 unauthenticated, new code present, healthy.
+
+## Trust boundary follow-up (procedure/case text) and case-search test
+Rule: approved procedure text and human-entered case text may *describe* identifiers or thresholds, but never by themselves
+confirm record identity, linkage or an observation.
+- Identifiers: authorized only from sources' own ids and structured `id`/`*_id` fields. Identifiers appearing only inside
+  procedure text (e.g. an example `UPLOAD-777`) are now rejected in model output (before this change they were accepted).
+  Case title/description are not evidence sources, so identifiers there are rejected too. Linkage remains structured-field-only.
+- Durations: a documented threshold may be quoted as a rule ("escalate after 15 minutes", "pending for more than 15 minutes?")
+  but a statement of elapsed time for a record ("pending for 15 minutes", "15 minutes ago") is rejected with the fixed reason
+  `Elapsed time stated as an observation`, even when the number matches the procedure. Elapsed time is not an observed fact
+  from a model; the deterministic diff reports observation dates only. Heuristic phrase list; novel phrasings could slip through.
+- Provenance: citations stay `source_id` + field + verbatim quote. In real-model runs 2 of 3 batches the model cited the hostile
+  field verbatim as a *quote* (model-authored question/uncertainty text was clean). Quotes are validated copies of source text,
+  stored/exported as citations, not shown in the panel; they are untrusted source text, not assertions. The harness now checks
+  model-authored fields strictly and counts quoted hostile text separately (earlier "VIOLATION" flags in this session were these quotes).
+- Tests: 79 unit tests pass (3 new: procedure-text ids, elapsed vs threshold, case text). Real Ollama on 3002: R1 6/6, R2 6/6,
+  R5a-c 6/6 each accepted, model fields clean; assessment_integration 7 groups and case_watch_integration 10 groups pass;
+  design-check 29, watch-check journey, visual-review (0 issues) pass. Real model never produced a rejected output in these runs,
+  so the new rejections are verified by deterministic hostile outputs only.
+- Case-search flake: cause demonstrated. The test filled the box then waited a fixed 600 ms; the page debounces 180 ms then replaces the
+  table with "Loading cases…" until the response arrives. With the /cases?q=case+4 response delayed 900 ms the old wait saw 0 rows
+  (new wait: 1 row). Test now waits for that response and for the loading state to detach. No application change.
+- Deployed: api + worker to 3001 (web unchanged, no migration, DB untouched, fingerprint unchanged). Rollback: images tagged
+  `pre-boundary-e9eee72` (the immediate prior image was overwritten because my tag command failed; code-only rollback to e9eee72).

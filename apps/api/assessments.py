@@ -191,13 +191,16 @@ def validate_refs(refs,sources):
 
 IDS=re.compile(r'\b(?:DOC|SYNC|JOB|PROC|UPLOAD|CASE|KB|CT|SITE|OPS)-[A-Za-z0-9_-]+\b',re.I)
 DURATION=re.compile(r'\b(\d+(?:\.\d+)?)\s*[- ]\s*(minutes?|hours?|days?|seconds?)\b',re.I)
+N=r'\d+(?:\.\d+)?\s*[- ]\s*(?:minutes?|hours?|days?|seconds?)'
+# A documented threshold may be quoted as a rule, never as an elapsed time observed for this record.
+ELAPSED=re.compile(r'\b(?:pending|waiting|stuck|elapsed|delayed|open|queued)\b[^.?!]{0,20}\b(?:for|since)\s+(?:the\s+(?:past|last)\s+)?'+N+r'|\b'+N+r'\s+(?:ago|(?:has|have)\s+(?:passed|elapsed))',re.I)
 MOMENT=re.compile(r'\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?|\b\d{1,2}:\d{2}(?::\d{2})?\b')
 RESOLUTION=(re.compile(r'\b(?:mark(?:ed)?|set|close[ds]?|resolve[ds]?)\b[^.?!]{0,25}\b(?:case|issue)\b',re.I),
             re.compile(r'\b(?:case|issue)\b[^.?!]{0,15}\b(?:is|was|has been)\s+(?:resolved|closed|fixed)\b',re.I))
 
 def trusted(sources):
     """Identity and time come only from structured fields; free text (statuses, error text, observations, claims) never authorizes anything.
-    Procedure text is approved workspace knowledge and may document identifiers and thresholds."""
+    Approved procedure text may document thresholds, which may be quoted as rules; identifiers or durations in it never authorize a record, linkage or observation."""
     ids,procedure,times=[],[],[]
     for s in sources:
         ids.append(str(s['id']))
@@ -207,13 +210,14 @@ def trusted(sources):
                 if (k=='id' or k.endswith('_id')) and IDENTIFIER.fullmatch(str(v)): ids.append(str(v))
                 if k in TIME_KEYS and v: times.append(str(v))
         elif s['kind']=='procedure': procedure.append(json.dumps(s['fields'],default=str))
-    return ' '.join(ids+procedure),' '.join(procedure),times
+    return ' '.join(ids),' '.join(procedure),times  # identifiers in procedure text describe a rule; they never authorize a record
 
 def validate_text(text,sources):
     known_text,procedure,times=trusted(sources)
     if not {i.upper() for i in IDS.findall(text)}.issubset({i.upper() for i in IDS.findall(known_text)}): raise ValueError('Invented identifier in model output')
     documented={(n,u.lower().rstrip('s')) for n,u in DURATION.findall(procedure)}
     if any((n,u.lower().rstrip('s')) not in documented for n,u in DURATION.findall(text)): raise ValueError('Invented or changed documented threshold')
+    if ELAPSED.search(text): raise ValueError('Elapsed time stated as an observation')
     norm=lambda t:t.replace('T',' ')
     if any(not any(norm(m) in norm(t) for t in times) for m in MOMENT.findall(text)): raise ValueError('Invented or unsupported timestamp in model output')
     if any(r.search(text) for r in RESOLUTION): raise ValueError('Resolution claim or instruction in model output')

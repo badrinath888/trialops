@@ -54,3 +54,4 @@
 - Live: docker compose up -d --no-deps --no-build --wait web after tested image tag.
 - Migrations apply at api start (python migrate.py); backup first: bash scripts/verify-backup.sh. Keep old images for rollback.
 - Preserve all DBs/accounts/uploads/private files; never reset or send externally.
+- 2026-10-12: trust-boundary follow-up (procedure/case text ids rejected, elapsed-time rule) + case-search test waits for response; api/worker live; see CASE-WATCH-VERIFICATION.md.
