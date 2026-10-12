@@ -189,14 +189,34 @@ def validate_refs(refs,sources):
         r.update(version=s['version'],observed_at=s['observed_at'])
 
 
+IDS=re.compile(r'\b(?:DOC|SYNC|JOB|PROC|UPLOAD|CASE|KB|CT|SITE|OPS)-[A-Za-z0-9_-]+\b',re.I)
+DURATION=re.compile(r'\b(\d+(?:\.\d+)?)\s*[- ]\s*(minutes?|hours?|days?|seconds?)\b',re.I)
+MOMENT=re.compile(r'\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?|\b\d{1,2}:\d{2}(?::\d{2})?\b')
+RESOLUTION=(re.compile(r'\b(?:mark(?:ed)?|set|close[ds]?|resolve[ds]?)\b[^.?!]{0,25}\b(?:case|issue)\b',re.I),
+            re.compile(r'\b(?:case|issue)\b[^.?!]{0,15}\b(?:is|was|has been)\s+(?:resolved|closed|fixed)\b',re.I))
+
+def trusted(sources):
+    """Identity and time come only from structured fields; free text (statuses, error text, observations, claims) never authorizes anything.
+    Procedure text is approved workspace knowledge and may document identifiers and thresholds."""
+    ids,procedure,times=[],[],[]
+    for s in sources:
+        ids.append(str(s['id']))
+        if s.get('observed_at'): times.append(str(s['observed_at']))
+        if s['kind'] in ('document_processing','synchronization'):
+            for k,v in s['fields'].items():
+                if (k=='id' or k.endswith('_id')) and IDENTIFIER.fullmatch(str(v)): ids.append(str(v))
+                if k in TIME_KEYS and v: times.append(str(v))
+        elif s['kind']=='procedure': procedure.append(json.dumps(s['fields'],default=str))
+    return ' '.join(ids+procedure),' '.join(procedure),times
+
 def validate_text(text,sources):
-    evidence=json.dumps(sources,default=str)
-    ids=re.compile(r'\b(?:DOC|SYNC|JOB|PROC|UPLOAD|CASE|KB|CT|SITE|OPS)-[A-Za-z0-9_-]+\b',re.I)
-    known=set(ids.findall(evidence))
-    if not set(ids.findall(text)).issubset(known): raise ValueError('Invented identifier in model output')
-    condition=re.compile(r'\b(\d+(?:\.\d+)?)\s*[- ]\s*(minutes?|hours?|days?|seconds?)\b',re.I)
-    documented={(n,u.lower().rstrip('s')) for n,u in condition.findall(evidence)}
-    if any((n,u.lower().rstrip('s')) not in documented for n,u in condition.findall(text)): raise ValueError('Invented or changed documented threshold')
+    known_text,procedure,times=trusted(sources)
+    if not {i.upper() for i in IDS.findall(text)}.issubset({i.upper() for i in IDS.findall(known_text)}): raise ValueError('Invented identifier in model output')
+    documented={(n,u.lower().rstrip('s')) for n,u in DURATION.findall(procedure)}
+    if any((n,u.lower().rstrip('s')) not in documented for n,u in DURATION.findall(text)): raise ValueError('Invented or changed documented threshold')
+    norm=lambda t:t.replace('T',' ')
+    if any(not any(norm(m) in norm(t) for t in times) for m in MOMENT.findall(text)): raise ValueError('Invented or unsupported timestamp in model output')
+    if any(r.search(text) for r in RESOLUTION): raise ValueError('Resolution claim or instruction in model output')
     if re.search(r'(?:confidence|probability|certainty).{0,40}\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%.{0,30}(?:confident|confidence)',text,re.I): raise ValueError('Confidence percentages are not permitted')
 
 

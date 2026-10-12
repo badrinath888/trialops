@@ -13,7 +13,7 @@ function Update({u}:{u:Row}){
    <ul>{u.refs.map((r:Row,i:number)=><li key={i}><code>{r.id}</code> · version <code>{String(r.version).slice(0,12)}</code> · observed {r.observed_at?stamp(r.observed_at):'date not recorded'}</li>)}</ul>
    <small>Changes and linkage are detected deterministically (no AI).</small>
    {u.model.status==='completed'&&<><p><b>Local model suggestions · not verified</b></p><ul>{u.model.questions.map((q:Row,i:number)=><li key={i}>{q.question} <small>({q.uncertainty})</small></li>)}</ul></>}
-   {u.model.status==='unavailable'&&<small> {u.model.detail}</small>}
+   {u.model.status==='unavailable'&&<small> {u.model.detail}{u.model.failure&&` Diagnosis: ${u.model.failure.category}${u.model.failure.reason?' · '+u.model.failure.reason:''} · attempts ${u.model.failure.attempts}.`}</small>}
   </details>
  </article>;
 }

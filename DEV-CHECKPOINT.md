@@ -43,6 +43,7 @@
   Details/limits in CASE-WATCH-VERIFICATION.md (local model output was rejected by validator in the sample run; deterministic path ok).
 - Backup restore-verified before migration; live DB fingerprint unchanged; rollback: compose.case-watch-rollback.yaml (api/worker/web).
 - Real-model follow-up DONE: prompt/schema contract fixed (one question per gap), validation unchanged; see CASE-WATCH-VERIFICATION.md. api/worker redeployed; rollback tag pre-model-contract-0e96415.
+- Evidence boundary DONE (validate_text trusts structured ids/times only; sanitized model.failure); rollback tag pre-boundary-e9eee72. Report: CASE-WATCH-VERIFICATION.md.
 - Remaining: none required. Real-model checks: docker exec test-api python /app/tests/real_model_watch_check.py.
 ## Commands (project root)
 - Test: docker compose -p trialops-release-test -f compose.yaml -f compose.release-test.yaml

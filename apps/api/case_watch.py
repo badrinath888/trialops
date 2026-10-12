@@ -123,21 +123,39 @@ def build(c, w, case, ctx, catalog, changes, cur):
     return body, (model_sources, ctx) if model_sources and open_gaps else None
 
 
+SAFE_REASONS = frozenset({  # fixed validator messages only; anything else (e.g. text that may echo model/record content) is reduced to a category
+    'Forged or unavailable citation/record field', 'Forged passage reference', 'Invented identifier in model output',
+    'Invented or changed documented threshold', 'Invented or unsupported timestamp in model output',
+    'Resolution claim or instruction in model output', 'Confidence percentages are not permitted',
+    'Invented or duplicate uncertainty gap', 'Model response too large',
+    'Selected input exceeds 20 KB. Select fewer relevant evidence passages.', 'Local Ollama endpoint unavailable or not permitted'})
+
+
+def failure_of(e, attempts):
+    """Sanitized diagnosis: category, fixed reason code and attempt count. Never model text, record text or raw exception text."""
+    if isinstance(e, (urllib.error.URLError, TimeoutError, OSError)): return {'category': 'timeout' if isinstance(e, TimeoutError) or 'timed out' in str(e) else 'unreachable', 'attempts': attempts}
+    if type(e) is ValueError and str(e) in SAFE_REASONS: return {'category': 'validation', 'reason': str(e), 'attempts': attempts}
+    return {'category': 'invalid_output', 'attempts': attempts}
+
+
 def add_model(body, pending, call=None):
     """Bounded, optional local-model questions, run outside any DB transaction. Failure keeps the deterministic update."""
     if not pending: return body
     sources, ctx = pending
     cfg = config('questions')
     body['model'] = {'engine': 'local_ollama', 'status': 'unavailable', 'detail': 'Model-assisted questions unavailable; deterministic update saved.'}
-    for _ in range(2):
+    for n in range(1, 3):
         try:
             r = (call or assess)('questions', '', sources, ctx, cfg)
             if r.get('engine') == 'local_ollama':
                 body['model'] = {'engine': 'local_ollama', 'status': 'completed', 'model': cfg['model'], 'questions': [{k: q[k] for k in ('question', 'uncertainty', 'citations')} for q in r['questions']]}
             break
-        except (urllib.error.URLError, TimeoutError, OSError):
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            body['model']['failure'] = failure_of(e, n)
             continue
-        except Exception:
+        except Exception as e:
+            body['model']['failure'] = failure_of(e, n)
+            logging.warning('Case watch model output rejected: %s', body['model']['failure'])
             break
     return body
 

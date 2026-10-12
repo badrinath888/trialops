@@ -165,7 +165,7 @@ try:
     # exports
     pkg = A.call(f'/cases/{CID}/package.json'); text = json.dumps(pkg)
     assert len(pkg['watch_updates']) == len(updates()) and pkg['watch']['status'] == 'active'
-    assert all(set(x['model']) <= {'engine', 'status', 'model', 'questions', 'detail'} for x in pkg['watch_updates']) and 'reasoning' not in text.lower().replace('no private reasoning', '')
+    assert all(set(x['model']) <= {'engine', 'status', 'model', 'questions', 'detail', 'failure'} for x in pkg['watch_updates']) and 'reasoning' not in text.lower().replace('no private reasoning', '')
     from report import build_case_report
     assert len(build_case_report(json.loads(text))) > 1000
     passed('JSON/PDF package includes watch history and excludes private model reasoning')
