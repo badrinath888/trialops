@@ -68,3 +68,24 @@ For public evaluation, review `.env` settings `ENABLE_DEMO`, `ENABLE_SIGNUP`, `D
 ## Positioning when sharing
 
 Describe the actual product: an evidence-led clinical operations support application with versioned procedures, historical synthetic snapshots, human review, and tracked resolution. Say when the hosted instance uses procedure matching rather than an LLM. Do not describe scenario ROI as measured savings, or claim patient-data readiness or regulatory certification. Invite feedback through the in-product Feedback page.
+
+## Scheduled offsite backups (not yet performed on a real remote)
+`scripts/backup-offsite.sh` dumps the database, restores it into a temporary database (`RESTORE_VERIFY=true`), copies the dump to an
+rclone remote, checks the remote size, then deletes local and remote dumps older than `RETENTION_DAYS` (default 14, minimum 2).
+Any failed step writes `FAILED ... at step: ...` to `backups/backup-offsite.status` and stderr, and pings `HEALTHCHECK_URL/fail`
+if set; success pings `HEALTHCHECK_URL`. Alert on a missed success ping, since a crashed cron job reports nothing.
+1. Install rclone on the server; create a private bucket and an application key limited to that bucket (the key must allow delete for retention).
+2. `cp .backup.env.example .backup.env; chmod 600 .backup.env`; replace the placeholders.
+3. Run once by hand: `bash scripts/backup-offsite.sh`, then list the remote and restore that file on a separate host with `scripts/restore.sh` before relying on it.
+4. Schedule: `17 3 * * * cd /path/to/trialops-release && bash scripts/backup-offsite.sh >> backups/cron.log 2>&1`.
+Dumps contain all workspace data and are not encrypted by this script; use a private bucket and enable provider-side encryption.
+
+## Client addresses and rate limits
+Per-visitor limits use the address the web tier sends to the API. The web tier trusts `X-Forwarded-For` only when `TRUST_PROXY=true`,
+which `compose.production.yaml` sets because Caddy is then the only way to reach web (no published port) and Caddy overwrites the header
+with the real peer address; web uses the last entry. Without it (local runs) the header is ignored and all visitors share one bucket.
+Do not set `TRUST_PROXY=true` or publish the web port if anything other than Caddy (or another proxy you control that overwrites the header)
+can reach web. If you put Cloudflare or a load balancer in front of Caddy, all visitors will appear as that proxy until Caddy is configured with `trusted_proxies` for it.
+`tests/proxy_ip_check.sh` was run once on the test stack (Caddy with the production directives, plain HTTP): spoofed-header rotation did not evade the
+login limit, a second real source had a separate limit, and untrusted mode ignored the header. Not yet tested behind a real HTTPS domain.
+`APP_PUBLIC_URL` (used in emailed links) is now set from `DOMAIN` for API and worker in the production override.

@@ -1,6 +1,7 @@
 services:
   api:
     environment:
+      APP_PUBLIC_URL: https://${DOMAIN:?Set DOMAIN in .env}
       COOKIE_SECURE: "true"
       ENABLE_SIGNUP: ${ENABLE_SIGNUP:-true}
       ENABLE_DEMO: ${ENABLE_DEMO:-true}
@@ -8,11 +9,13 @@ services:
       SIGNUP_HOURLY_LIMIT: ${SIGNUP_HOURLY_LIMIT:-20}
   worker:
     environment:
+      APP_PUBLIC_URL: https://${DOMAIN:?Set DOMAIN in .env}
       COOKIE_SECURE: "true"
   web:
     ports: !reset []
     environment:
       APP_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
+      TRUST_PROXY: "true"  # web is reachable only through Caddy, which overwrites X-Forwarded-For
   caddy:
     image: caddy:2
     environment:

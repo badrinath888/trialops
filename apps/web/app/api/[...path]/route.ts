@@ -47,9 +47,10 @@ async function proxy(request: Request) {
           "X-Response-Token": path === "/external-response" ? request.headers.get("x-response-token") || "" : "",
           Cookie: request.headers.get("cookie") || "",
           "X-Internal-Key": internalKey(),
-          "X-Client-IP":
-            request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-            "local",
+          // Forwarded headers are client-controlled unless a trusted proxy (Caddy, which overwrites them) fronts the app.
+          "X-Client-IP": process.env.TRUST_PROXY === "true"
+            ? request.headers.get("x-forwarded-for")?.split(",").pop()?.trim() || "local"
+            : "local",
         },
         body,
         cache: "no-store",

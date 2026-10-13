@@ -30,3 +30,4 @@ test-results/
 artifacts/
 output/
 tmp/pdfs/
+.backup.env

@@ -55,3 +55,4 @@
 - Migrations apply at api start (python migrate.py); backup first: bash scripts/verify-backup.sh. Keep old images for rollback.
 - Preserve all DBs/accounts/uploads/private files; never reset or send externally.
 - 2026-10-12: trust-boundary follow-up (procedure/case text ids rejected, elapsed-time rule) + case-search test waits for response; api/worker live; see CASE-WATCH-VERIFICATION.md.
+- 2026-10-13: public-beta prep (local only, nothing deployed/purchased): APP_PUBLIC_URL from DOMAIN in compose.production.yaml; TRUST_PROXY web client-IP; tests/proxy_ip_check.sh passed on 3002; scripts/backup-offsite.sh tested only with an rclone SHIM (no real offsite, no real remote restore). Live 3001 not redeployed.
