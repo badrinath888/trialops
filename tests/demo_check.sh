@@ -28,7 +28,9 @@ get "/cases/$cid" "$B"; ok "visitor B cannot open A's case by id" 404 "$G"; get 
 # 3. forwarded-IP trust: only the last entry counts (limit 3 sample workspaces per visitor per hour)
 for i in 1 2 3 4; do start_session "spoof-$i, 9.9.9.9"; done
 ok "spoofed leading entries do not create new visitors (4th from one visitor)" 429 "$CODE"
-start_session 'spoof-1, 8.8.8.8'; ok "a different last entry is a different visitor" 200 "$CODE"
+if [ -n "${VIA_CF:-}" ]; then  # Cloudflare appends the real address, so a supplied last entry cannot create a new visitor
+ start_session 'spoof-1, 8.8.8.8'; ok "supplied last entry cannot impersonate another visitor (Cloudflare appends real address)" 429 "$CODE"
+else start_session 'spoof-1, 8.8.8.8'; ok "a different last entry is a different visitor" 200 "$CODE"; fi
 # 4. exposure
 ok "API docs are not served" 404 "$(curl -s -o /dev/null -w '%{http_code}' "$URL/api/docs")"
 pub=$(docker ps --filter label=com.docker.compose.project=trialops-release-demo --format '{{.Ports}}' | grep -o '[0-9.]*:[0-9]*->' | sort -u | tr '\n' ' ')
