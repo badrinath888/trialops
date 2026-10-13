@@ -2532,3 +2532,14 @@ h1, h2, h3, strong { overflow-wrap: anywhere; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 .data-table th.head-nudge { position:relative; left:8px; } /* heading only: aligns "Version" with the v1 values; no layout or row-height change */
+
+/* Improvement workflows: recurrence/prevention, readiness, procedure impact, bulk actions, feedback queue */
+.improve-panel { margin-top:16px; } .improve-panel > header { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; justify-content:space-between; margin-bottom:8px; } .improve-panel h3 { margin:0; } .improve-panel h4 { margin:16px 0 6px; }
+.improve-panel details { border-top:1px solid var(--line); padding:8px 0; } .improve-panel summary { cursor:pointer; font-weight:600; }
+.improve-panel .inline-form { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:end; margin:8px 0; } .improve-panel .inline-form label { margin:0; }
+.improve-plan { display:grid; gap:8px; max-width:720px; margin:8px 0; } .improve-plan label, .improve-panel form label { display:grid; gap:4px; } .improve-plan label.check, .improve-panel label.check { display:flex; gap:8px; align-items:center; }
+.improve-action { border:1px solid var(--line); border-radius:6px; padding:8px 12px; display:grid; gap:8px; } .improve-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.improve-list { padding-left:20px; margin:6px 0; } .improve-counts { display:flex; flex-wrap:wrap; gap:6px; }
+.impact-change del { background:#f3dcd8; text-decoration:line-through; } .impact-change ins { background:#dcebd8; text-decoration:none; }
+.bulk-bar { margin:8px 0 12px; border-left:3px solid var(--copper, #b87333); } .bulk-bar .error-text { color:#8c2a1b; }
+.badge.status-missing, .badge.status-expired, .badge.status-declined { background:#f3dcd8; color:#6e1f14; } .badge.status-awaiting_review, .badge.status-reviewing, .badge.status-received { background:#f4e6cf; color:#5c3d0a; } .badge.status-reviewed, .badge.status-completed, .badge.status-active { background:#dcebd8; color:#1f4a1a; } .badge.status-not_applicable, .badge.status-draft, .badge.status-closed { background:#e8e6e2; color:#3b3b3b; } .badge.status-planned, .badge.status-in_progress { background:#dde6f0; color:#1d3a5c; }

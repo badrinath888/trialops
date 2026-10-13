@@ -1066,6 +1066,14 @@ def create_visit(body: VisitCreate, a=Depends(actor)):
         ).fetchone()
 
 
+def readiness_summary(study, site, a):
+    from improvement import readiness_rows
+    with connect() as c:
+        rows, counts = readiness_rows(c, a["workspace_id"], study, site)
+    return {"counts": counts, "items": [{"requirement": r["requirement"]["name"], "status": r["status"], "reason": r["reason"]} for r in rows],
+            "note": "Dated records entered in the readiness tracker; not a current verification."}
+
+
 def visit_data(a, rid):
     item = one(
         "SELECT * FROM monitoring_visits WHERE workspace_id=%s AND id=%s",
@@ -1092,6 +1100,7 @@ def visit_data(a, rid):
                 (a["workspace_id"], cids),
             )
         ],
+        "readiness": readiness_summary(item["study_id"], item["site_id"], a),
         "interpretation": "Preparation inventory; no validated compliance or readiness score is calculated.",
     }
 
@@ -1384,10 +1393,27 @@ def case_package(a, cid):
             for s in r["result"].get("sources", [])
             if s["id"] in r["result"]["recommendation"]["evidence_ids"]
         }
+        from improvement import group_view
+        package["recurrence"] = []
+        if a["role"] in ("owner", "reviewer"):
+            for g in c.execute("SELECT DISTINCT group_id FROM recurrence_members WHERE workspace_id=%s AND case_id=%s", (w, cid)).fetchall():
+                v = group_view(c, w, g["group_id"])
+                gr = v["group"]
+                package["recurrence"].append({"type": "group", "id": gr["id"], "title": gr["title"], "pattern": gr["pattern"], "basis": gr["basis"], "status": gr["status"], "criteria": v["criteria"], "note": v["interpretation"]})
+                package["recurrence"] += [{"type": "member", "group_id": gr["id"], **{k: m[k] for k in ("case_id", "added_at", "removed_at", "removal_reason")}} for m in v["members"]]
+                for pl in v["plans"]:
+                    package["recurrence"].append({"type": "plan", "group_id": gr["id"], **{k: pl[k] for k in ("id", "title", "summary", "status", "version", "completion_note")}})
+                    package["recurrence"] += [{"type": "action", "plan_id": pl["id"], **{k: x[k] for k in ("text", "owner_name", "due_at", "status", "evidence")}} for x in pl["actions"]]
+                package["recurrence"] += [{"type": "window", "group_id": gr["id"], **{k: x[k] for k in ("label", "role", "start_at", "end_at", "exposure_count", "exposure_unit", "matching_cases")}} for x in v["windows"]]
+                package["recurrence"] += [{"type": "history", "group_id": gr["id"], "kind": e["kind"], "actor": e["actor_name"], "at": e["created_at"], "detail": e["payload"]} for e in v["events"]]
         package["procedure_versions"] = c.execute(
             "SELECT * FROM procedure_versions WHERE workspace_id=%s AND article_id=ANY(%s) ORDER BY article_id,version",
             (w, list(aids)),
         ).fetchall()
+        package["procedure_impact"] = c.execute(
+            "SELECT article_id,old_version,new_version,status,rationale,reviewed_at,version FROM procedure_impact_reviews WHERE workspace_id=%s AND article_id=ANY(%s) ORDER BY article_id,new_version",
+            (w, list(aids)),
+        ).fetchall() if a["role"] in ("owner", "reviewer") else []
         policy = c.execute(
             "SELECT * FROM workspace_policies WHERE workspace_id=%s", (w,)
         ).fetchone()

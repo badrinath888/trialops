@@ -446,6 +446,8 @@ def build_case_report(package):
         ("Recorded supporting evidence", "evidence"),
         ("Human-confirmed related cases", "links"),
         ("Procedure reassessments", "reassessments"),
+        ("Procedure-change impact reviews — deterministic comparison, human decision", "procedure_impact"),
+        ("Recurrence groups and prevention plans — reviewer-confirmed; no causal claim", "recurrence"),
         ("Explicitly recorded human effort", "effort"),
         ("Frozen selected-evidence assessments", "assessments"),
         ("Assessment human decisions and request drafts", "assessment_decisions"),

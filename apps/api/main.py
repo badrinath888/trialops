@@ -1152,8 +1152,19 @@ def export(a=Depends(actor)):
                 "notifications",
                 "evaluation_runs",
                 "walkthrough_progress",
+                "recurrence_groups",
+                "recurrence_members",
+                "prevention_plans",
+                "prevention_actions",
+                "recurrence_windows",
+                "readiness_requirements",
+                "readiness_records",
+                "procedure_impact_reviews",
+                "bulk_batches",
             )
         },
+        # Feedback, its triage and improvement records are deliberately not exported.
+        "improvement_history": query("SELECT * FROM improvement_events WHERE workspace_id=%s AND scope NOT IN ('feedback','improvement') ORDER BY created_at,id", (w,)),
     }
 
 
@@ -1165,7 +1176,9 @@ from assessments import router as assessment_router
 app.include_router(assessment_router)
 
 from case_watch import router as watch_router
+from improvement import router as improvement_router
 app.include_router(watch_router)
+app.include_router(improvement_router)
 
 from account_access import router as account_router
 from five_features import router as five_router

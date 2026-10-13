@@ -3,6 +3,7 @@ import {MyWork,NextStep,ResponsePolicy} from "../../user-workflow-panels";
 import {WaitingQueue,SupportDirectory,EmailVerification} from "../../five-feature-panels";
 import {AssessmentPanel} from "../../assessment-panel";
 import {CaseWatch} from "../../case-watch";
+import {RecurrencePanel,ReadinessTracker,ProcedureImpact,MyFeedback,FeedbackQueue} from "../../improvement-panels";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -281,11 +282,13 @@ export default function Workspace() {
             <>
               <Knowledge me={me} />
               <KnowledgeRelease me={me} />
+              <ProcedureImpact me={me} />
             </>
           ) : view === "operations" ? (
             <>
               <Operations me={me} />
               <RecordsRelease me={me} />
+              <ReadinessTracker me={me} />
             </>
           ) : view === "roi" ? (
             <ROI me={me} />
@@ -792,6 +795,7 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
       )}
       <NextStep item={c} onInvestigate={investigate} refreshKey={String(data.job?.status)+String(data.runs.length)+String(c.updated_at)}/>
       <CaseWatch cid={c.id} refreshKey={String(workflowRefresh)}/>
+      <RecurrencePanel cid={c.id} me={me}/>
       <div id="case-investigate" className="case-actions panel">
         <div>
           <h3>Investigate this issue</h3>
@@ -2428,13 +2432,7 @@ function Feedback({ me }: { me: Row }) {
     [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
     [busy, setBusy] = useState(false),
-    [items, setItems] = useState<Row[]>([]);
-  const load = useCallback(async () => {
-    if (me.role === "owner") setItems(await api("/feedback"));
-  }, [me.role]);
-  useEffect(() => {
-    load().catch((e) => setError(e.message));
-  }, [load]);
+    [seen, setSeen] = useState(0);
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -2445,7 +2443,7 @@ function Feedback({ me }: { me: Row }) {
       setSuccess(
         "Thank you. Your feedback was saved for the deployment operator.",
       );
-      await load();
+      setSeen((n) => n + 1);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -2508,20 +2506,8 @@ function Feedback({ me }: { me: Row }) {
           external message is sent.
         </small>
       </form>
-      {me.role === "owner" && (
-        <>
-          <h2>Workspace feedback</h2>
-          {items.map((x) => (
-            <article className="panel" key={x.id}>
-              <Badge value={x.rating + " / 5"} />
-              <p className="preserve">{x.message}</p>
-              <small>
-                {x.name || "Former member"} · {stamp(x.created_at)}
-              </small>
-            </article>
-          ))}
-        </>
-      )}
+      <MyFeedback key={"mine" + seen} />
+      <FeedbackQueue key={"queue" + seen} me={me} />
     </>
   );
 }
