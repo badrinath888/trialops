@@ -31,3 +31,5 @@ artifacts/
 output/
 tmp/pdfs/
 .backup.env
+.secrets-demo/
+.demo/

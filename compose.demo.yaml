@@ -1,0 +1,93 @@
+# Zero-paid-service demo on this Mac: own project, volume, secrets and loopback port 3003. Use via `bash demo.sh`.
+# Reuses locally built images (tagged by demo.sh); never builds. Only web is ever tunnelled.
+name: trialops-release-demo
+x-api: &api
+  image: trialops-release-demo-api:current
+  pull_policy: never
+  environment: &api-env
+    DB_PASSWORD_FILE: /run/secrets/db_password
+    INTERNAL_KEY_FILE: /run/secrets/internal_key
+    AI_MODE: ollama
+    OLLAMA_URL: http://host.docker.internal:11434
+    OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+    SMTP_HOST: ""            # external email stays disabled: no verification/recovery mail is ever sent
+    MAIL_FROM: ""
+    APP_PUBLIC_URL: http://localhost:3003
+    COOKIE_SECURE: "true"
+    ENABLE_DEMO: "true"
+    ENABLE_SIGNUP: "false"   # no permanent accounts; sample workspaces only (expire after 24 h)
+    DEMO_HOURLY_LIMIT: "20"
+    DEMO_IP_HOURLY_LIMIT: "3"
+    SIGNUP_HOURLY_LIMIT: "0"
+    REGISTER_IP_HOURLY_LIMIT: "0"
+  secrets: [db_password, internal_key]
+  extra_hosts: ["host.docker.internal:host-gateway"]
+  depends_on:
+    db: {condition: service_healthy}
+  restart: unless-stopped
+  init: true
+  security_opt: ["no-new-privileges:true"]
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    pull_policy: never
+    environment:
+      POSTGRES_USER: trialops
+      POSTGRES_DB: trialops
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U trialops -d trialops"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1g
+    restart: unless-stopped
+  api:
+    <<: *api
+    mem_limit: 1g
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  worker:   # a single worker runs one job at a time, which bounds concurrent Ollama work
+    <<: *api
+    mem_limit: 1g
+    depends_on:
+      api: {condition: service_healthy}
+    command: [python, worker.py]
+    healthcheck:
+      test: [CMD, python, -c, "import pathlib,time; p=pathlib.Path('/tmp/trialops-worker-heartbeat'); assert p.exists() and time.time()-p.stat().st_mtime<600"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  web:
+    image: trialops-release-demo-web:current
+    pull_policy: never
+    environment:
+      API_URL: http://api:8000
+      INTERNAL_KEY_FILE: /run/secrets/internal_key
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3003}   # must equal the browser-visible origin (demo.sh sets the tunnel URL)
+      TRUST_PROXY: "true"   # the Cloudflare edge appends the visitor address; web uses the last X-Forwarded-For entry
+    secrets: [internal_key]
+    ports: ["127.0.0.1:3003:3000"]
+    mem_limit: 512m
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+volumes:
+  database:
+secrets:
+  db_password: {file: ./.secrets-demo/db_password}
+  internal_key: {file: ./.secrets-demo/internal_key}
