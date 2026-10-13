@@ -61,3 +61,6 @@
 - backend written (improvement.py, main/release_api/report wiring, migration 009); next: build test api, unit/integration tests, then UI
 - backend + tests/improvement_integration.py (11 groups) PASS on 3002 test API; next: UI panels, browser journey, regressions, backup, live deploy
 - UI done (apps/web/app/improvement-panels.tsx; mounted in page.tsx/case-list.tsx; proxy allowlist updated); tests/browser/improvement-check.cjs PASS on 3002; next: regressions, docs, backup+live deploy of api/worker/web (NOT 3003)
+- 2026-10-13 DONE five enhancements, commit 4c2942e (docs: IMPROVEMENT-WORKFLOWS.md). 3002: unit 79, improvement_integration 11 groups, case_watch_integration 10, improvement-check journey (desktop+390px), design-check 29, visual-review (0 issues), user-workflow-check, release-check, watch-check pass.
+  visual-review case-search step now waits for rendered state (earlier response-wait fix matched the wrong URL; an unexplained response timeout once in the full run, not reproduced in isolation 6/6).
+  Live 3001: fresh restore-verified backup backups/trialops-verified-20261013-184330-3542.dump; migration 009 applied; api/worker/web redeployed; rollback tags pre-improvement-68b4a94; fingerprint unchanged. 3003 demo untouched (old image snapshot, no migration).
