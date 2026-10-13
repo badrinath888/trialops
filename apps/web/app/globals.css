@@ -2531,3 +2531,4 @@ h1, h2, h3, strong { overflow-wrap: anywhere; }
   .overview-metrics > .metric em { padding: 0; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.data-table th.head-nudge { position:relative; left:8px; } /* heading only: aligns "Version" with the v1 values; no layout or row-height change */

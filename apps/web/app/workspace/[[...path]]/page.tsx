@@ -1886,7 +1886,7 @@ function Knowledge({ me }: { me: Row }) {
                 </span>
               ),
             },
-            { label: "Version", render: (a) => <span>v{a.version}</span> },
+            { label: "Version", head: "head-nudge", render: (a) => <span>v{a.version}</span> },
             {
               label: "Status",
               render: (a) => (
