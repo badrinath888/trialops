@@ -1374,6 +1374,18 @@ def case_package(a, cid):
         else:
             package["assessments"] = []
             package["assessment_decisions"] = []
+        from journey import current_journey, current_outcomes
+        reviewer = a["role"] in ("owner", "reviewer")
+        for key, table in (("journey_subjects", "journey_subjects"), ("journey_links", "journey_links"), ("journey_assessments", "journey_assessments"), ("journey_plan_items", "journey_plan_items"), ("journey_attestations", "journey_attestations"), ("journey_priority_inputs", "journey_priority_inputs"), ("journey_priority_mappings", "journey_priority_mappings"), ("journey_prioritizations", "journey_prioritizations"), ("journey_outcomes", "journey_outcomes"), ("journey_verifications", "journey_verifications")):
+            package[key] = c.execute("SELECT * FROM " + table + " WHERE workspace_id=%s AND case_id=%s ORDER BY created_at", (w, cid)).fetchall() if key not in ("journey_verifications", "journey_attestations", "journey_priority_inputs", "journey_priority_mappings", "journey_prioritizations") or reviewer else []
+        if not reviewer:
+            package["journey_assessments"] = []  # frozen decision inputs follow the existing assessment boundary
+        jn = current_journey(c, a, item)[0]
+        package["journey"] = {k: v for k, v in jn.items() if k != "records"} if jn else None
+        from priority import compute as priority_compute, summary_rows
+        pdata = priority_compute(c, a, item)
+        package["journey_priority_summary"] = summary_rows(pdata) if pdata else []
+        package["journey_summary"] = [{"stage": s["label"], "recorded_status": s["operational_status"] or "not recorded", "evidence_assessment": s["assessment"], "as_of": s["as_of"], "missing": s["missing"], "conflicts": s["conflicts"]} for s in jn["stages"]] if jn else []
         from five_features import blocked_seconds
         package['waiting_time']=[{'blocked_seconds':blocked_seconds(package['blockers'],item['resolved_at'] or datetime.now(timezone.utc)),'interpretation':'Overlapping intervals counted once; elapsed waiting, not human effort.'}]
         package["case"] = item

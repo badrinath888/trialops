@@ -92,7 +92,7 @@ export default function Landing() {
               <span>Sample investigation</span>
             </div>
             <div className="preview-body">
-              <div className="preview-tag">ILLUSTRATIVE SAMPLE · CT-204</div>
+              <div className="preview-tag">Illustrative sample · CT-204</div>
               <h2>
                 Certificate missing
                 <br />

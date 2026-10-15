@@ -18,7 +18,7 @@ export function usePreferences(userId?: string) {
   return prefs;
 }
 export function DataTable<T>({ label, columns, rows, rowKey, empty }: { label: string; columns: { label: string; head?: string; render: (row: T) => React.ReactNode }[]; rows: T[]; rowKey: (row: T) => string; empty?: React.ReactNode }) {
-  return <div className="data-table-wrap" role="region" aria-label={label + " table; scroll for more columns"} tabIndex={0}><table className="data-table" aria-label={label}><thead><tr>{columns.map(c => <th key={c.label} scope="col" className={c.head}>{c.label}</th>)}</tr></thead><tbody>{rows.length ? rows.map(row => <tr key={rowKey(row)}>{columns.map(c => <td key={c.label}>{c.render(row)}</td>)}</tr>) : <tr><td colSpan={columns.length}>{empty || "No matching records."}</td></tr>}</tbody></table></div>;
+  return <div className="data-table-wrap" role="region" aria-label={label + " table; scroll for more columns"} tabIndex={0}><table className="data-table" aria-label={label}><thead><tr>{columns.map(c => <th key={c.label} scope="col" className={c.head}>{c.label}</th>)}</tr></thead><tbody>{rows.length ? rows.map(row => <tr key={rowKey(row)}>{columns.map(c => <td key={c.label} className={c.head}>{c.render(row)}</td>)}</tr>) : <tr><td colSpan={columns.length}>{empty || "No matching records."}</td></tr>}</tbody></table></div>;
 }
 export function CasePreview({ caseId, onClose }: { caseId: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), invoker = useRef<HTMLElement | null>(null);

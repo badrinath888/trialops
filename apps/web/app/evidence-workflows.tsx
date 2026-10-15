@@ -4,7 +4,7 @@ import {ContinuityPanel,ContactSelect} from "./five-feature-panels";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {AssessmentPanel} from "./assessment-panel";
-import { api, download, stamp } from "./lib";
+import { api, download, plural, stamp } from "./lib";
 type Row = Record<string, any>;
 const localTime = (value = new Date().toISOString()) => {
   const d = new Date(value);
@@ -986,7 +986,7 @@ export function CaseWorkflows({
             </form>
             {data.effort.map((e: Row) => (
               <p key={e.id}>
-                {e.minutes} minutes · {e.activity.replaceAll("_", " ")} ·{" "}
+                {plural(e.minutes, "minute")} · {e.activity.replaceAll("_", " ")} ·{" "}
                 {e.notes}
               </p>
             ))}

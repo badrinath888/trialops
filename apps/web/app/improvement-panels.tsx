@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, stamp } from "./lib";
+import { api, plural, stamp } from "./lib";
 import { DataTable } from "./workspace-components";
 type Row = Record<string, any>;
 const uid = () => crypto.randomUUID();
@@ -59,7 +59,7 @@ function GroupCard({ g, me, members, reload, setError }: { g: Row; me: Row; memb
   const reviewer = isReviewer(me), { busy, act } = useAct(setError);
   const [planTitle, setPlanTitle] = useState(""), [w, setW] = useState({ label: "", role: "baseline", start: "", end: "", count: "", unit: "" });
   const active = g.members.filter((m: Row) => !m.removed_at), removed = g.members.filter((m: Row) => m.removed_at), c = g.comparison;
-  return <details className="improve-group"><summary>{g.group.title} · {active.length} cases · <Status v={g.group.status}/></summary>
+  return <details className="improve-group"><summary>{g.group.title} · {plural(active.length, "case")} · <Status v={g.group.status}/></summary>
     <p><b>Observed pattern (reviewer-stated):</b> {g.group.pattern}</p>
     <p className="subtle">Scope: {g.criteria.category} · {g.criteria.study_id} · {g.criteria.site_id || "all sites"}. {g.interpretation}</p>
     <ul className="improve-list">{active.map((m: Row) => <li key={m.id}><Link href={"/workspace/cases/" + encodeURIComponent(m.case_id)}>{m.case_id}</Link> {m.title} <small>added {stamp(m.added_at)}</small></li>)}</ul>
@@ -73,7 +73,7 @@ function GroupCard({ g, me, members, reload, setError }: { g: Row; me: Row; memb
       <label>New plan title<input value={planTitle} onChange={e => setPlanTitle(e.target.value)} minLength={3} maxLength={120} required/></label><button disabled={busy}>Create draft plan</button></form>}
     <h4>Subsequent matching cases</h4>
     {g.windows.length === 0 ? <p className="subtle">No windows defined. Define a baseline and a follow-up window of equal length, with an exposure denominator if one is available.</p> :
-      <ul>{g.windows.map((x: Row) => <li key={x.id}><b>{x.label}</b> ({humanize(x.role)}) {d10(x.start_at)} → {d10(x.end_at)} (end exclusive, {x.days} days): <b>{x.matching_cases}</b> matching cases{x.exposure_count ? ` · exposure ${x.exposure_count} ${x.exposure_unit}` : " · exposure not provided"}</li>)}</ul>}
+      <ul>{g.windows.map((x: Row) => <li key={x.id}><b>{x.label}</b> ({humanize(x.role)}) {d10(x.start_at)} → {d10(x.end_at)} (end exclusive, {plural(x.days, "day")}): <b>{x.matching_cases}</b> matching {x.matching_cases === 1 ? "case" : "cases"}{x.exposure_count ? ` · exposure ${x.exposure_count} ${x.exposure_unit}` : " · exposure not provided"}</li>)}</ul>}
     {c && <p className="subtle" role="status">{c.can_compare ? `Descriptive rates per ${c.unit}: ${c.baseline_rate_per_unit} → ${c.follow_up_rate_per_unit}. ${c.note}` : "No comparison made. " + c.reasons.join(" ")}</p>}
     {reviewer && <form className="inline-form" onSubmit={e => { e.preventDefault(); void act(async () => { await api("/recurrence/groups/" + g.group.id + "/windows", { id: uid(), label: w.label, role: w.role, start_at: w.start + "T00:00:00Z", end_at: w.end + "T00:00:00Z", exposure_count: w.count ? Number(w.count) : null, exposure_unit: w.unit || null }); setW({ label: "", role: "baseline", start: "", end: "", count: "", unit: "" }); reload(); }); }}>
       <label>Window label<input value={w.label} onChange={e => setW({ ...w, label: e.target.value })} required maxLength={80}/></label>
@@ -126,14 +126,14 @@ export function ReadinessTracker({ me }: { me: Row }) {
   const edit = (r: Row) => { const rec = r.record; setOk(""); setSel({ ...r, applicable: rec ? rec.applicable : true, reason: rec?.applicability_reason, identity: rec?.document_identity, docv: rec?.document_version, expiry: d10(rec?.expiry_date), asof: d10(rec?.as_of), ref: rec?.evidence?.[0]?.ref }); };
   const counts = data?.counts || {};
   return <section className="panel improve-panel" aria-label="Document readiness tracker">
-    <header><h3>Document readiness</h3><small>Reviewer-defined required documents by study and site · dated records, not certification</small></header>
+    <header><h3>Document readiness</h3><small>Required documents by study and site · dated records, not certification</small></header>
     <Msg error={error} ok={ok}/>
     <div className="inline-form"><label>Study<select value={study} onChange={e => { setStudy(e.target.value); setSite(""); }}>{cat?.studies.map((s: Row) => <option key={s.id} value={s.id}>{s.id} · {s.name}</option>)}</select></label>
       <label>Site<select value={site} onChange={e => setSite(e.target.value)}><option value="">All sites</option>{sites.map((s: Row) => <option key={s.id} value={s.id}>{s.id}</option>)}</select></label>
       {reviewer && <button className="outline" onClick={() => { setSel(null); setRq({ id: uid(), name: "", guidance: "", site_id: "", requires_expiry: false, version: 0 }); }}>Define required document</button>}</div>
     {!data ? <p role="status">Loading readiness…</p> : <>
       <p className="improve-counts">{["missing", "expired", "awaiting_review", "reviewed", "not_applicable"].map(k => <span key={k} className={"badge status-" + k}>{humanize(k)} {counts[k] || 0}</span>)}</p>
-      <p className="subtle">{data.interpretation}</p>
+      <details className="subtle"><summary>How statuses are determined</summary><p>{data.interpretation}</p></details>
       <DataTable<Row> label="Document readiness" rows={data.rows} rowKey={r => r.requirement.id + r.site_id} empty={<div className="empty"><h3>No required documents defined</h3><p>{reviewer ? "Define the documents this study or site must have on file." : "A reviewer can define required documents."}</p></div>} columns={[
         { label: "Required document", render: r => <><strong>{r.requirement.name}</strong>{r.requirement.requires_expiry && <small> · expiry required</small>}<small>{r.requirement.guidance}</small></> },
         { label: "Site", render: r => r.site_id },
@@ -166,20 +166,22 @@ export function ReadinessTracker({ me }: { me: Row }) {
 
 /* ------------------------------------------------------------------ 3. procedure-change impact review (Knowledge) */
 export function ProcedureImpact({ me }: { me: Row }) {
-  const [list, setList] = useState<Row[] | null>(null), [art, setArt] = useState(""), [oldV, setOldV] = useState(0), [newV, setNewV] = useState(0), [d, setD] = useState<Row | null>(null), [error, setError] = useState(""), [ok, setOk] = useState(""), [status, setStatus] = useState("needed"), [why, setWhy] = useState("");
+  const [list, setList] = useState<Row[] | null>(null), [art, setArt] = useState(""), [oldV, setOldV] = useState(0), [newV, setNewV] = useState(0), [d, setD] = useState<Row | null>(null), [error, setError] = useState(""), [ok, setOk] = useState(""), [status, setStatus] = useState("needed"), [why, setWhy] = useState(""), [note, setNote] = useState("");
   const { busy, act } = useAct(setError), reviewer = isReviewer(me);
   useEffect(() => { api("/knowledge").then((r: Row[]) => { setList(r); if (r[0]) setArt(r[0].id); else setList([]); }).catch(e => setError(e.message)); }, []);
-  const load = useCallback(async (o?: number, n?: number) => { if (!art) return; try { const r = await api(`/knowledge/${encodeURIComponent(art)}/impact-review` + (o && n ? `?old=${o}&new=${n}` : "")); setD(r); setOldV(r.old_version); setNewV(r.new_version); setStatus(r.review?.status || "needed"); setWhy(""); setError(""); } catch (e) { setD(null); setError((e as Error).message); } }, [art]);
-  useEffect(() => { setD(null); setOk(""); void load(); }, [load]);
+  const load = useCallback(async (o?: number, n?: number) => { if (!art) return; try { const r = await api(`/knowledge/${encodeURIComponent(art)}/impact-review` + (o && n ? `?old=${o}&new=${n}` : "")); setD(r); setOldV(r.old_version); setNewV(r.new_version); setStatus(r.review?.status || "needed"); setWhy(""); setError(""); setNote(""); } catch (e) { setD(null); const m = (e as Error).message; if (/two retained versions/i.test(m)) { setError(""); setNote("Only one version of this procedure is saved, so there is nothing to compare yet."); } else setError(m); } }, [art]);
+  useEffect(() => { setD(null); setOk(""); setNote(""); void load(); }, [load]);
   const save = (e: React.FormEvent) => { e.preventDefault(); void act(async () => { const r = await api(`/knowledge/${encodeURIComponent(art)}/impact-review`, { old_version: d!.old_version, new_version: d!.new_version, status, rationale: why, comparison_hash: d!.comparison_hash, expected_version: d!.review?.version ?? 0 }); setD(r); setWhy(""); setOk("Review recorded. No check, case or earlier decision was changed."); }); };
   if (list && list.length === 0) return null;
-  return <section className="panel improve-panel" aria-label="Procedure change impact review">
-    <header><h3>Procedure change impact</h3><small>Deterministic passage comparison (not AI) · you decide whether reassessment is needed</small></header>
+  return <details className="panel improve-panel overview-fold" aria-label="Procedure change impact review">
+    <summary><span>Procedure change impact</span></summary>
+    <p className="subtle">Compares retained passages (not AI) · you decide whether reassessment is needed</p>
     <Msg error={error} ok={ok}/>
     <div className="inline-form"><label>Procedure<select value={art} onChange={e => setArt(e.target.value)}>{list?.map(a => <option key={a.id} value={a.id}>{a.title} (current v{a.version}{a.archived ? ", archived" : ""})</option>)}</select></label>
       {d && d.versions.length > 1 && <><label>Older version<select value={oldV} onChange={e => void load(Number(e.target.value), newV)}>{d.versions.map((v: Row) => <option key={v.version} value={v.version}>v{v.version}</option>)}</select></label>
         <label>Newer version<select value={newV} onChange={e => void load(oldV, Number(e.target.value))}>{d.versions.map((v: Row) => <option key={v.version} value={v.version}>v{v.version}</option>)}</select></label></>}</div>
-    {!d && !error && <p role="status">Loading comparison…</p>}
+    {!d && !error && !note && <p role="status">Loading comparison…</p>}
+    {!d && note && <p className="subtle" role="status">{note}</p>}
     {d && <>
       {d.archived && <p className="subtle">This procedure is archived. Existing references stay as cited.</p>}
       {d.superseded_by && <p className="subtle" role="status">A newer version (v{d.superseded_by}) exists; this comparison remains valid for v{d.old_version} → v{d.new_version}.</p>}
@@ -194,7 +196,7 @@ export function ProcedureImpact({ me }: { me: Row }) {
       {reviewer ? <form onSubmit={save} className="improve-plan"><fieldset><legend>Is reassessment needed?</legend><label className="check"><input type="radio" checked={status === "needed"} onChange={() => setStatus("needed")}/> Reassessment needed</label><label className="check"><input type="radio" checked={status === "not_needed"} onChange={() => setStatus("not_needed")}/> Not needed</label></fieldset>
         <label>Why (at least 10 characters)<textarea value={why} onChange={e => setWhy(e.target.value)} rows={2} minLength={10} maxLength={1000} required/></label>
         <button disabled={busy}>{d.review ? "Update review" : "Record review"}</button></form> : <p className="subtle">Reviewers and owners record the reassessment decision.</p>}</>}
-  </section>;
+  </details>;
 }
 
 /* ------------------------------------------------------------------ 4. bulk owner / deadline changes (Cases table) */
@@ -241,7 +243,7 @@ export function FeedbackQueue({ me }: { me: Row }) {
   const saveTriage = (e: React.FormEvent) => { e.preventDefault(); void act(async () => { await api(`/feedback/${open!.id}/triage`, { expected_version: open!.version, status: open!.status, owner_id: open!.owner_id || null, internal_note: open!.internal_note, public_note: open!.public_note, confidential: !!open!.confidential, improvement_id: open!.improvement_id || null, related_feedback: open!.related_feedback || [] }); setOpen(null); setOk("Triage saved. Nothing was published or sent."); await load(); }); };
   const saveImp = (e: React.FormEvent) => { e.preventDefault(); void act(async () => { await api("/improvements", { id: imp!.id, title: imp!.title, description: imp!.description || "", status: imp!.status, owner_id: imp!.owner_id || null, explanation: imp!.explanation || "", expected_version: imp!.version ?? 0 }); setImp(null); setOk("Improvement saved."); await load(); }); };
   return <section className="panel improve-panel" aria-label="Feedback queue">
-    <header><h3>Feedback queue</h3><small>Maintainers only · submitters see just their own status and any public note</small></header>
+    <header><h3>Feedback queue</h3><small>Maintainers only · submitters see their own status and public note</small></header>
     <Msg error={error} ok={ok}/>
     {!q ? <p role="status">Loading feedback…</p> : <>
       <div className="inline-form"><label>Show<select value={filter} onChange={e => setFilter(e.target.value)}><option value="">All states</option>{q.states.map((s: string) => <option key={s} value={s}>{humanize(s)}</option>)}</select></label>

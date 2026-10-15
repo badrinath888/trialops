@@ -33,6 +33,20 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
   if(body !== undefined && typeof window !== "undefined" && !path.endsWith("/next-step/open")) window.dispatchEvent(new Event("trialops-workflow-changed"));
   return data;
 }
+export const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+// Bring a just-opened disclosure into view only when needed; no focus change, instant under reduced motion.
+export function revealOpened(el: HTMLElement) {
+  requestAnimationFrame(() => {
+    let top = 0;
+    document.querySelectorAll<HTMLElement>("header,[class*=topbar],[class*=sticky]").forEach((n) => {
+      const s = getComputedStyle(n), r = n.getBoundingClientRect();
+      if ((s.position === "sticky" || s.position === "fixed") && r.top <= 1 && r.bottom < innerHeight / 2) top = Math.max(top, r.bottom);
+    });
+    const gap = 12, r = el.getBoundingClientRect(), fits = r.height <= innerHeight - top - 2 * gap;
+    const delta = fits ? (r.top < top + gap ? r.top - (top + gap) : r.bottom > innerHeight - gap ? r.bottom - (innerHeight - gap) : 0) : r.top - (top + gap);
+    if (Math.abs(delta) > 2) scrollBy({ top: delta, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  });
+}
 export function stamp(v: string) {
   return new Date(v).toLocaleString(undefined, {
     dateStyle: "medium",

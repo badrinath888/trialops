@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {AssessmentDemo} from "./assessment-panel";
-import { api, stamp } from "./lib";
+import { api, plural, stamp } from "./lib";
 type Row = Record<string, any>;
 const local = (value = new Date().toISOString()) => {
   const d = new Date(value);
@@ -54,10 +54,12 @@ export function OverviewRelease({ me }: { me: Row }) {
   return (
     <>
       {me.demo && <><SampleWalkthrough /><AssessmentDemo /></>}
-      <details className="panel">
+      <details className="panel overview-fold">
         <summary>
-          In-app follow-up reminders ·{" "}
-          {notifications?.filter((n) => !n.read_at).length || 0} unread
+          <span>Follow-up reminders</span>
+          <span className="fold-count">
+            {notifications?.filter((n) => !n.read_at).length || 0} unread
+          </span>
         </summary>
         <Messages error={error} message="" />
         {notifications === null ? (
@@ -120,8 +122,8 @@ export function MeasuredMetrics() {
     if (open) void load();
   }, [open]);
   return (
-    <details className="panel" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>Measured workflow activity</summary>
+    <details className="panel overview-fold" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary><span>Workflow activity</span></summary>
       <Messages error={error} message="" />
       {data ? (
         <>
@@ -412,7 +414,7 @@ export function WorkspacePolicies({ me }: { me: Row }) {
     }
   }
   return (
-    <section className="panel">
+    <section className="panel evidence-prefs">
       <h2>Evidence and follow-up preferences</h2>
       <Messages error={error} message={message} />
       {prefs && (
@@ -477,7 +479,7 @@ export function WorkspacePolicies({ me }: { me: Row }) {
           }}
         >
           <h3>Workspace evidence policy</h3>
-          <div className="form-grid">
+          <div className="form-grid policy-grid">
             <label>
               Observation freshness limit (hours)
               <input
@@ -554,10 +556,12 @@ export function KnowledgeRelease({ me }: { me: Row }) {
   }, [load]);
   return (
     <>
-      <details className="panel">
+      <details className="panel overview-fold">
         <summary>
-          Procedure changes and reassessment ·{" "}
-          {impact?.filter((i) => i.status === "pending").length || 0} pending
+          <span>Procedure changes and reassessment</span>
+          <span className="fold-count">
+            {impact?.filter((i) => i.status === "pending").length || 0} pending
+          </span>
         </summary>
         <Messages error={error} message={message} />
         {impact === null ? (
@@ -694,8 +698,8 @@ function EvaluationDashboard({ me }: { me: Row }) {
     return () => clearInterval(t);
   }, [running, load]);
   return (
-    <details className="panel evaluation-dashboard">
-      <summary>AI evaluation dashboard</summary>
+    <details className="panel evaluation-dashboard overview-fold">
+      <summary><span>AI evaluations</span></summary>
       <Messages error={error} message="" />
       {!data ? (
         <p role="status">Loading evaluation dataset…</p>
@@ -907,9 +911,10 @@ export function RecordsRelease({ me }: { me: Row }) {
   }
   return (
     <>
-      <details className="panel">
+      <details className="panel overview-fold">
         <summary>
-          Immutable observation history · {history.length} snapshots
+          <span>Observation history</span>
+          <span className="fold-count">{plural(history.length, "snapshot")}</span>
         </summary>
         <Messages error={error} message={message} />
         {history.length === 0 ? (
@@ -931,8 +936,8 @@ export function RecordsRelease({ me }: { me: Row }) {
         </p>
       </details>
       {me.role === "owner" && (
-        <details className="panel bulk-import">
-          <summary>Preview CSV/JSON record import</summary>
+        <details className="panel bulk-import overview-fold">
+          <summary><span>CSV/JSON record import</span></summary>
           <Messages error={error} message={message} />
           <label>
             Import format
@@ -1146,8 +1151,8 @@ function MonitoringVisits({ me }: { me: Row }) {
       });
   }
   return (
-    <details className="panel monitoring-visits">
-      <summary>Monitoring-visit preparation</summary>
+    <details className="panel monitoring-visits overview-fold">
+      <summary><span>Monitoring-visit preparation</span></summary>
       <Messages error={error} message={message} />
       {canReview && (
         <form

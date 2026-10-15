@@ -1,0 +1,8 @@
+# Application-only rollback; retain additive schema (migrations 010-012) and all data.
+services:
+  api:
+    image: trialops-release-api:pre-journey-a3a13df
+  worker:
+    image: trialops-release-worker:pre-journey-a3a13df
+  web:
+    image: trialops-release-web:pre-journey-a3a13df

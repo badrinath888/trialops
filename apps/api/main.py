@@ -1179,6 +1179,10 @@ from case_watch import router as watch_router
 from improvement import router as improvement_router
 app.include_router(watch_router)
 app.include_router(improvement_router)
+from journey import router as journey_router
+app.include_router(journey_router)
+from priority import router as priority_router
+app.include_router(priority_router)
 
 from account_access import router as account_router
 from five_features import router as five_router

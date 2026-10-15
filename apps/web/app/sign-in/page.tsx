@@ -39,7 +39,7 @@ export default function SignIn() {
         TrialOps<span>✳</span>
       </Link>
         <h2>From issue<br/>to evidence.</h2><p>A clear workspace for operational questions, documented checks, and your decisions.</p>
-        <div className="auth-steps">{[["file","Choose a case","Start with what happened."],["search","Follow the evidence","Inspect procedures and recorded conditions."],["check","Record your decision","Review first. Resolve separately."]].map(([icon,title,text])=><div className="auth-step" key={title}><Icon name={icon} size={28}/><div><strong>{title}</strong><small>{text}</small></div></div>)}</div>
+        <figure className="flow-example" aria-label="Example workflow: issue, evidence, human review"><figcaption>Example workflow · illustrative, not live activity</figcaption><ol>{[["Issue","Binder sync stalled at a site","Example: submitted"],["Evidence","Procedure and recorded conditions, cited","Example: 2 sources"],["Human review","You decide. Resolve separately.","Example: awaiting review"]].map(([title,text,status],i)=><li key={title}><span className="flow-num" aria-hidden="true">{i+1}</span><div><strong>{title}</strong><small>{text}</small></div><em>{status}</em></li>)}</ol></figure>
         <footer>Evidence first. Human reviewed.</footer>
       </aside>
       <section className="auth-form-area">

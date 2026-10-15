@@ -3,11 +3,12 @@ import {MyWork,NextStep,ResponsePolicy} from "../../user-workflow-panels";
 import {WaitingQueue,SupportDirectory,EmailVerification} from "../../five-feature-panels";
 import {AssessmentPanel} from "../../assessment-panel";
 import {CaseWatch} from "../../case-watch";
+import {DocumentJourney} from "../../document-journey";
 import {RecurrencePanel,ReadinessTracker,ProcedureImpact,MyFeedback,FeedbackQueue} from "../../improvement-panels";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { api, ApiError, categories, download, money, stamp } from "../../lib";
+import { api, ApiError, categories, download, money, plural, stamp } from "../../lib";
 import { Icon } from "../../ui";
 import JobProgress from "../../job-progress";
 import CaseList from "../../case-list";
@@ -168,9 +169,9 @@ export default function Workspace() {
         <div className="workspace-label workspace-header-compact">
           <strong>{me.workspace_name}</strong>
           <small>
-            {me.demo ? "Sample workspace · " : ""}
+            {me.demo ? "Sample · " : ""}
             {me.role === "owner"
-              ? "Workspace admin"
+              ? "Admin"
               : me.role === "reviewer"
                 ? "Reviewer"
                 : "Analyst"}
@@ -286,9 +287,8 @@ export default function Workspace() {
             </>
           ) : view === "operations" ? (
             <>
-              <Operations me={me} />
+              <Operations me={me} after={<ReadinessTracker me={me} />} />
               <RecordsRelease me={me} />
-              <ReadinessTracker me={me} />
             </>
           ) : view === "roi" ? (
             <ROI me={me} />
@@ -325,7 +325,7 @@ function Overview({ me }: { me: Row }) {
       <Heading
         label="OPERATIONS OVERVIEW"
         title="Workspace overview"
-        description={`Welcome, ${me.name}. Review what needs attention.`}
+        description={`Welcome, ${me.name}.`}
       >
         <Link className="button" href="/workspace/new">
           <Icon name="plus" size={17} />
@@ -467,13 +467,6 @@ function Overview({ me }: { me: Row }) {
       {preview && (
         <CasePreview caseId={preview} onClose={() => setPreview("")} />
       )}
-      <div className="getting-started">
-        <Icon name="file" size={20} />
-        <span>Need a walkthrough? The guide explains each step.</span>
-        <Link className="text-link" href="/guide">
-          Open guide →
-        </Link>
-      </div>
     </>
   );
 }
@@ -795,12 +788,13 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
       )}
       <NextStep item={c} onInvestigate={investigate} refreshKey={String(data.job?.status)+String(data.runs.length)+String(c.updated_at)}/>
       <CaseWatch cid={c.id} refreshKey={String(workflowRefresh)}/>
+      <DocumentJourney cid={c.id} me={me} refreshKey={String(workflowRefresh)}/>
       <RecurrencePanel cid={c.id} me={me}/>
       <div id="case-investigate" className="case-actions panel">
         <div>
           <h3>Investigate this issue</h3>
           <p>
-            Find procedures and saved site records. You can leave while it runs.
+            Retrieves procedures and saved site records. You can leave while it runs.
           </p>
         </div>
         <button
@@ -866,10 +860,7 @@ function CaseDetail({ id, me }: { id: string; me: Row }) {
               <h2>Case status</h2>
               <Badge value={c.status} />
             </div>
-            <p>
-              Close the case only after completing current checks. Approval
-              alone does not resolve it.
-            </p>
+            <p>Approval alone does not resolve the case.</p>
             {c.resolution && (
               <div className="notice">
                 <h3>Recorded resolution</h3>
@@ -1550,7 +1541,6 @@ function HistoryList() {
       <Heading
         label="INVESTIGATION HISTORY"
         title="Investigations"
-        description="Reopen the procedures and records saved with an investigation."
       >
         <Link className="button" href="/workspace/cases">
           Choose a case to investigate
@@ -1581,7 +1571,7 @@ function HistoryList() {
           ))}
         </select>
       </div>
-      <div className="panel list-panel" aria-busy={loading}>
+      <div className="history-list" aria-busy={loading}>
         {loading ? (
           <p role="status">Loading investigations…</p>
         ) : !data ? (
@@ -1596,7 +1586,7 @@ function HistoryList() {
         ) : (
           data.items.map((r: Row) => (
             <Link
-              className="case-row"
+              className="case-row history-entry"
               key={r.id}
               href={"/workspace/runs/" + r.id}
             >
@@ -1613,7 +1603,7 @@ function HistoryList() {
       </div>
       <div className="pagination">
         <span role="status">
-          {loading ? "Updating results…" : `${data?.total ?? 0} investigations`}
+          {loading ? "Updating results…" : plural(data?.total ?? 0, "investigation")}
         </span>
         <button
           className="outline"
@@ -1797,7 +1787,6 @@ function Knowledge({ me }: { me: Row }) {
       <Heading
         label="KNOWLEDGE LIBRARY"
         title="Knowledge library"
-        description="Manage the procedures used in investigations."
       >
         {owner && (
           <div className="actions">
@@ -1910,8 +1899,8 @@ function Knowledge({ me }: { me: Row }) {
         />
       </div>
       <p className="subtle">
-        {visible.length} procedures in this view. Earlier investigations keep
-        their saved source version.
+        {plural(visible.length, "procedure")}. Earlier investigations keep the
+        version they used.
       </p>
       {editorOpen && (
         <section
@@ -2034,12 +2023,13 @@ function Knowledge({ me }: { me: Row }) {
     </>
   );
 }
-function Operations({ me }: { me: Row }) {
+function Operations({ me, after }: { me: Row; after?: React.ReactNode }) {
   const [items, setItems] = useState<Row[]>([]),
     [text, setText] = useState(""),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [importOpen, setImportOpen] = useState(false);
   const snapshotFile = useRef<HTMLInputElement>(null);
   const [snapshotFileName, setSnapshotFileName] = useState("");
   const load = useCallback(async () => setItems(await api("/operations")), []);
@@ -2080,10 +2070,10 @@ function Operations({ me }: { me: Row }) {
       <Heading
         label="OPERATIONAL RECORDS"
         title="Operational records"
-        description="Historical site snapshots. Current status and case linkage require verification."
+        description="Historical site snapshots. Status and case linkage are unverified."
       >
         {me.role === "owner" && (
-          <a className="button" href="#snapshot-import">
+          <a className="button" href="#snapshot-import" onClick={() => setImportOpen(true)}>
             Import snapshot
           </a>
         )}
@@ -2096,7 +2086,7 @@ function Operations({ me }: { me: Row }) {
       )}
       <div className="two-grid">
         {items.map((row) => (
-          <article className="panel" key={row.site_id}>
+          <article className="panel ops-group" key={row.site_id}>
             <h2>
               {row.study_id} · {row.site_id}
             </h2>
@@ -2106,7 +2096,7 @@ function Operations({ me }: { me: Row }) {
                 <div className="record-group" key={kind}>
                   <strong>{kind.replaceAll("_", " ")}</strong>
                   <p>
-                    {g.records.length} records ·{" "}
+                    {plural(g.records.length, "record")} ·{" "}
                     {g.snapshot ? stamp(g.snapshot.observed_at) : "No snapshot"}
                   </p>
                   <details>
@@ -2138,14 +2128,20 @@ function Operations({ me }: { me: Row }) {
           </article>
         ))}
       </div>
+      {after}
       {me.role === "owner" ? (
-        <form id="snapshot-import" className="panel form-panel" onSubmit={save}>
-          <h2>Import a synthetic snapshot</h2>
-          <p>
-            Use the example format. Both groups must share a matching snapshot,
-            study, site, and observation time. Up to 10 records per group.
-            Uploaded timestamps must not exceed the observation time.
-          </p>
+        <details id="snapshot-import" className="panel overview-fold" open={importOpen} onToggle={(e) => setImportOpen(e.currentTarget.open)}>
+        <summary><span>Import a synthetic snapshot</span></summary>
+        <form className="form-panel" onSubmit={save}>
+          <p>Use the example format.</p>
+          <details>
+            <summary>Format rules</summary>
+            <p>
+              Both groups share one snapshot, study, site and observation time.
+              Up to 10 records per group. Uploaded timestamps cannot be later
+              than the observation time.
+            </p>
+          </details>
           <div className="snapshot-file-actions">
             <button
               type="button"
@@ -2195,7 +2191,7 @@ function Operations({ me }: { me: Row }) {
             Snapshot JSON
             <textarea
               className="code-editor"
-              rows={8}
+              rows={6}
               value={text}
               onChange={(e) => setText(e.target.value)}
               maxLength={100000}
@@ -2210,6 +2206,7 @@ function Operations({ me }: { me: Row }) {
             are unchanged.
           </p>
         </form>
+        </details>
       ) : (
         <p className="notice">Only owners can import operational snapshots.</p>
       )}
@@ -2281,7 +2278,7 @@ function ROI({ me }: { me: Row }) {
       <Heading
         label="VALUE TRACKING"
         title="ROI scenarios"
-        description="Scenario capacity value is not cash savings. Hardware, electricity, development, and maintenance costs are excluded."
+        description="Capacity value is an estimate, not cash savings. Infrastructure and development costs are excluded."
       />
       <ErrorBox error={error} />
       {message && (
@@ -2342,9 +2339,8 @@ function ROI({ me }: { me: Row }) {
             ))}
           </div>
           <p className="subtle">
-            Human-work minutes include investigation and review effort. Do not
-            substitute model execution time. Zero AI cost means an assumed zero
-            local API charge.
+            Count investigation and review effort, not model run time. Zero AI
+            cost assumes no local API charge.
           </p>
           <label className="check-row">
             <input
@@ -2455,7 +2451,6 @@ function Feedback({ me }: { me: Row }) {
       <Heading
         label="PRODUCT FEEDBACK"
         title="Share feedback"
-        description="Help improve the workflow."
       />
       <ErrorBox error={error} />
       {success && (
@@ -2932,7 +2927,7 @@ function Settings({ me }: { me: Row }) {
             </div>
             <details className="catalog-list">
               <summary>
-                {catalog.studies.length} studies · {catalog.sites.length} sites
+                {plural(catalog.studies.length, "study", "studies")} · {plural(catalog.sites.length, "site")}
               </summary>
               <div className="catalog-table">
                 {catalog.studies.map((study: Row) => (

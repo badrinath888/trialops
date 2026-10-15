@@ -36,13 +36,19 @@ fs.mkdirSync(out, { recursive: true });
   const wait = async (l) => l.waitFor({ state: "visible", timeout: 180000 });
   const button = (n) => page.getByRole("button", { name: n, exact: true });
   const call = async (p, body) => {
-    const r =
-      body === undefined
-        ? await page.request.get(base + "/api" + p)
-        : await page.request.post(base + "/api" + p, {
-            data: body,
-            headers: { Origin: base },
-          });
+    let r;
+    // Bounded wait (max 4 x 20s) only when the real 180/min session limit answers 429; limits themselves are untouched.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      r =
+        body === undefined
+          ? await page.request.get(base + "/api" + p)
+          : await page.request.post(base + "/api" + p, {
+              data: body,
+              headers: { Origin: base },
+            });
+      if (r.status() !== 429) break;
+      await page.waitForTimeout(20000);
+    }
     const d = await r.json();
     assert(r.ok(), JSON.stringify({ p, status: r.status(), d }));
     return d;
@@ -59,7 +65,7 @@ fs.mkdirSync(out, { recursive: true });
       fullPage: true,
       animations: "disabled",
     });
-    const target=name.startsWith("case-")?page.locator(".evidence-workflow"):name.startsWith("records-")?page.locator(".monitoring-visits"):name.startsWith("procedure-")?page.locator(".evaluation-dashboard"):page.getByText("Measured workflow activity",{exact:true});
+    const target=name.startsWith("case-")?page.locator(".evidence-workflow"):name.startsWith("records-")?page.locator(".monitoring-visits"):name.startsWith("procedure-")?page.locator(".evaluation-dashboard"):page.getByText("Workflow activity",{exact:true});
     if(await target.count()){await target.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,name+"-viewport.png"),fullPage:false,animations:"disabled"});}
     const measurements = await page.evaluate(() => {
       const rgba = (s) => (s.match(/[\d.]+/g) || []).map(Number),
@@ -173,6 +179,7 @@ fs.mkdirSync(out, { recursive: true });
     await wait(
       page.getByRole("status").filter({ hasText: "Preferences saved." }),
     );
+    await new Promise((r) => setTimeout(r, 65000)); // session limit is 180 requests/min; the journey section adds two case-page requests
     await go("/workspace/cases/CASE-4");
     await button("Run investigation").click();
     await wait(
@@ -230,6 +237,7 @@ fs.mkdirSync(out, { recursive: true });
       page.getByRole("status").filter({ hasText: "Request updated." }),
     );
     await button("Supporting observations").click();
+    await page.getByLabel("Observation type").selectOption("human_observation");
     await page
       .getByLabel("Observation and evidence summary", { exact: true })
       .fill(
@@ -385,9 +393,8 @@ fs.mkdirSync(out, { recursive: true });
     // Allow its window to renew before continuing; keep production limits intact.
     await page.waitForTimeout(61000);
     await go("/workspace/operations");
-    await page
-      .getByText("Preview CSV/JSON record import", { exact: true })
-      .click();
+    await page.locator(".bulk-import > summary").click();
+    await page.waitForFunction(() => document.querySelector(".bulk-import")?.open);
     await button("Load generic import example").click();
     await page.waitForFunction(()=>document.querySelector(".bulk-import textarea")?.value.includes("snapshot_id"));
     await button("Validate import preview").click();
@@ -450,7 +457,7 @@ fs.mkdirSync(out, { recursive: true });
       expected_version: k.version,
     });
     await go("/workspace/knowledge");
-    await page.getByText(/Procedure changes and reassessment ·/).click();
+    await page.getByText("Procedure changes and reassessment", { exact: true }).click();
     await page
       .locator("details")
       .filter({ has: page.getByLabel("Reassessment decision") })
@@ -472,7 +479,7 @@ fs.mkdirSync(out, { recursive: true });
     await wait(
       page.getByRole("status").filter({ hasText: "Reassessment recorded." }),
     );
-    await page.getByText("AI evaluation dashboard", { exact: true }).click();
+    await page.getByText("AI evaluations", { exact: true }).click();
     await page.getByLabel("Evaluation mode").selectOption("procedure");
     await button("Run isolated scenario evaluation").click();
     await wait(page.getByText(/procedure-matcher · completed/));
@@ -485,8 +492,8 @@ fs.mkdirSync(out, { recursive: true });
       "Procedure-change reassessment and actual worker evaluation results",
     );
     await go("/workspace");
-    await page.getByText(/In-app follow-up reminders ·/).click();
-    await page.getByText("Measured workflow activity", { exact: true }).click();
+    await page.getByText("Follow-up reminders", { exact: true }).click();
+    await page.getByText("Workflow activity", { exact: true }).click();
     await wait(page.getByText("Explicit human effort", { exact: true }));
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 950 });
