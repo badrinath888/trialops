@@ -11,6 +11,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { api, ApiError, categories, download, money, plural, stamp } from "../../lib";
 import { Icon } from "../../ui";
 import JobProgress from "../../job-progress";
+import { SourceAutomation } from "../../source-automation";
 import CaseList from "../../case-list";
 import {
   CasePreview,
@@ -2982,6 +2983,7 @@ function Settings({ me }: { me: Row }) {
 
       <div hidden={section !== "policy"}>
         <WorkspacePolicies me={me} />
+        <SourceAutomation me={me} />
       </div>
     </>
   );

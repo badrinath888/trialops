@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import {AssessmentDemo} from "./assessment-panel";
 import { api, plural, stamp } from "./lib";
 type Row = Record<string, any>;
 const local = (value = new Date().toISOString()) => {
@@ -53,7 +52,6 @@ export function OverviewRelease({ me }: { me: Row }) {
   }, [load]);
   return (
     <>
-      {me.demo && <><SampleWalkthrough /><AssessmentDemo /></>}
       <details className="panel overview-fold">
         <summary>
           <span>Follow-up reminders</span>
@@ -222,157 +220,6 @@ export function MeasuredMetrics() {
         Refresh activity
       </button>
     </details>
-  );
-}
-
-function SampleWalkthrough() {
-  const [progress, setProgress] = useState<Row | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
-  useEffect(() => {
-    api("/walkthrough")
-      .then(setProgress)
-      .catch((e) => setError(e.message));
-  }, []);
-  const steps = [
-    {
-      title: "Missing certificate",
-      body: "Investigate the uploaded certificate. Inspect its cited procedure, pending duration and dated upload record.",
-      path: "/workspace/cases/CASE-1",
-    },
-    {
-      title: "Failed synchronization",
-      body: "Investigate the failed synchronization job. Read its exact procedure and unsent draft.",
-      path: "/workspace/cases/CASE-4",
-    },
-    {
-      title: "Healthy status",
-      body: "Investigate the healthy synchronization status. Completed jobs should not trigger a failed-job escalation.",
-      path: "/workspace/cases/CASE-6",
-    },
-    {
-      title: "Unsupported request",
-      body: "Investigate the cafeteria question. Relevant support should be absent and approval unavailable.",
-      path: "/workspace/cases/CASE-7",
-    },
-    {
-      title: "Updated observations",
-      body: "Load a newer healthy synthetic observation, then compare it with the original in the synchronization case. Absence alone never establishes resolution.",
-      path: "/workspace/cases/CASE-4",
-    },
-    {
-      title: "Human verification and resolution",
-      body: "Review and activate the synchronization checks, record a current human observation, complete the checks, record a recommendation decision and resolve separately. Reopen and export its case package to inspect the preserved history.",
-      path: "/workspace/cases/CASE-4",
-    },
-  ];
-  async function update(step: number, skipped = false) {
-    setBusy(true);
-    setError("");
-    try {
-      setProgress(await api("/walkthrough", { step, skipped }));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (!progress)
-    return <p role="status">{error || "Loading sample walkthrough…"}</p>;
-  if (progress.skipped)
-    return (
-      <div className="panel">
-        <button
-          className="outline"
-          disabled={busy}
-          onClick={() => update(progress.step, false)}
-        >
-          Resume sample walkthrough
-        </button>
-        <Messages error={error} message="" />
-      </div>
-    );
-  const step = steps[progress.step];
-  return (
-    <section
-      className="panel walkthrough"
-      aria-label="Guided sample walkthrough"
-    >
-      <div className="section-heading">
-        <h2>
-          {step
-            ? `Sample walkthrough · ${progress.step + 1} of ${steps.length}`
-            : "Sample walkthrough reviewed"}
-        </h2>
-        <button
-          className="outline"
-          disabled={busy}
-          onClick={() => update(progress.step, true)}
-        >
-          Skip walkthrough
-        </button>
-      </div>
-      <Messages error={error} message={message} />
-      {step ? (
-        <>
-          <h3>{step.title}</h3>
-          <p>{step.body}</p>
-          <div className="actions">
-            <Link className="button" href={step.path}>
-              Open this scenario
-            </Link>
-            {progress.step === 4 && (
-              <button
-                className="outline"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await api("/walkthrough/updated-records", {});
-                    setMessage(
-                      "New synthetic observation saved in this sample workspace.",
-                    );
-                  } catch (e) {
-                    setError((e as Error).message);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                Load updated sample records
-              </button>
-            )}
-            <button
-              className="outline"
-              disabled={busy}
-              onClick={() => update(progress.step + 1)}
-            >
-              I reviewed this step · continue
-            </button>
-            {progress.step > 0 && (
-              <button
-                className="outline"
-                disabled={busy}
-                onClick={() => update(progress.step - 1)}
-              >
-                Previous step
-              </button>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          <p>
-            Review progress is saved in this sample workspace. Permanent
-            accounts use separate data.
-          </p>
-          <button className="outline" onClick={() => update(0)}>
-            Restart walkthrough
-          </button>
-        </>
-      )}
-    </section>
   );
 }
 

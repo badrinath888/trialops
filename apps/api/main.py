@@ -1183,6 +1183,8 @@ from journey import router as journey_router
 app.include_router(journey_router)
 from priority import router as priority_router
 app.include_router(priority_router)
+from source_events import router as source_router
+app.include_router(source_router)
 
 from account_access import router as account_router
 from five_features import router as five_router

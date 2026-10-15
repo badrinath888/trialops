@@ -2397,7 +2397,6 @@ input[type="checkbox"] { width:18px; height:18px; min-height:0; padding:0; margi
 .evidence-workflow .work-row strong,.related-case p { overflow-wrap:anywhere; }
 .monitoring-visits>section { margin-top:24px; }
 .monitoring-visits h3 { margin-top:20px; }
-.walkthrough .actions { gap:10px; }
 @media(max-width:600px) { .reminder-choices { grid-template-columns:1fr; } .check-item { padding:12px; } .workflow-tabs button { flex:1 1 130px; } .evidence-workflow .section-heading .actions { width:100%; } .evidence-workflow .section-heading .actions>* { flex:1; } }
 
 .assessment-panel { margin:12px 0; }
@@ -2691,3 +2690,9 @@ details.panel.overview-fold details { margin-inline:0; }
 .prio-edit form { display:grid; gap:10px; max-width:720px; margin:6px 0 10px; } .prio-edit fieldset { border:1px solid var(--line); border-radius:6px; padding:8px 12px; display:grid; gap:4px; } .prio-edit legend { font-size:15px; padding:0 4px; }
 .prio-move { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; padding:6px 0; border-top:1px solid var(--line); } .prio-move>span { flex:1 1 220px; }
 @media(max-width:700px) { .prio-state { margin-left:0; flex-basis:100%; } }
+
+.source-automation .source-list{list-style:none;padding:0;margin:12px 0}.source-automation .source-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:end;margin:12px 0}.source-automation code{overflow-wrap:anywhere}
+.source-update .source-headline{font-weight:600;margin:6px 0}.source-update details{margin-top:10px}
+.source-automation .source-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end}.source-automation .source-form label{margin:0}.source-automation .source-form>button{margin:0;min-height:44px;height:44px;white-space:nowrap}
+.source-automation label.check{flex-direction:row;align-items:flex-start;gap:8px;font-weight:400;margin:12px 0}.source-automation label.check input{flex:none;width:18px;height:18px;min-height:0;padding:0;margin:4px 0 0}
+@media(max-width:640px){.source-automation .source-form{grid-template-columns:1fr}.source-automation .source-form>button{justify-self:start}}

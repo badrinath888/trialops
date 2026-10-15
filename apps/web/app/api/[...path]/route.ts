@@ -9,7 +9,7 @@ async function proxy(request: Request) {
   const incoming = new URL(request.url),
     path = incoming.pathname.slice(4);
   if (
-    !/^\/(auth|intake|catalog|dashboard|cases|jobs|runs|knowledge|operations|roi|feedback|members|invitations|export|health|metrics|policies|visits|notifications|notification-preferences|evaluations|walkthrough|assessment-demo|contacts|waiting-queue|my-work|external-response|recurrence|prevention-plans|readiness|improvements)(\/|$)/.test(
+    !/^\/(auth|intake|catalog|dashboard|cases|jobs|runs|knowledge|operations|roi|feedback|members|invitations|export|health|metrics|policies|visits|notifications|notification-preferences|sources|evaluations|walkthrough|assessment-demo|contacts|waiting-queue|my-work|external-response|recurrence|prevention-plans|readiness|improvements)(\/|$)/.test(
       path,
     )
   )

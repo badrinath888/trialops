@@ -1,0 +1,9 @@
+# Application-only rollback of migration 013 (source events); retain additive schema and all data.
+# Run scripts/rollback-source-events.sh first (pauses sources, stops worker, fails queued/running source_event jobs).
+services:
+  api:
+    image: trialops-release-api:pre-source-17fe09b
+  worker:
+    image: trialops-release-worker:pre-source-17fe09b
+  web:
+    image: trialops-release-web:pre-source-17fe09b

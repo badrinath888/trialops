@@ -37,6 +37,10 @@ def claim():
 def process(job):
     started = time.monotonic()
     w = job["workspace_id"]
+    if job["kind"] == "source_event":
+        from source_events import process_source_event
+        process_source_event(job)
+        return
     if job["kind"] == "watch":
         from case_watch import process_watch
         process_watch(job)
@@ -246,6 +250,8 @@ def run_once():
             if job["kind"] == "assess"
             else "Case watch update failed. Retry from the case; no evidence was confirmed and nothing was sent."
             if job["kind"] == "watch"
+            else "Source update processing failed; it is retried a bounded number of times. Nothing was confirmed, sent or resolved."
+            if job["kind"] == "source_event"
             else "Embedding failed. Text search remains available. Check the model and save the procedure again to retry."
         )
         with connect() as c:
@@ -292,6 +298,9 @@ if __name__ == "__main__":
                 from case_watch import scan_watches
 
                 scan_watches()
+                from source_events import scan_sources
+
+                scan_sources()
                 last_watch = time.monotonic()
             if not run_once():
                 time.sleep(1)

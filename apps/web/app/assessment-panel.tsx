@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
-import {api,revealOpened,stamp} from "./lib";
+import {api,stamp} from "./lib";
 type Row=Record<string,any>;
 const names:Row={wording:"Check wording",linkage:"Review record linkage",questions:"Suggest next question"};
 const labels=["supported by selected evidence","contradicted","insufficient evidence","not assessable"];
@@ -31,10 +31,4 @@ export function AssessmentPanel({cid,text="",kind="wording",onChanged}: {cid:str
    </details>)}
   </div>}
  </section>
-}
-
-export function AssessmentDemo(){
- const [error,setError]=useState(""),[busy,setBusy]=useState(false),[started,setStarted]=useState(false);
- const stage=async(s:string)=>{setBusy(true);setError("");try{await api("/assessment-demo",{stage:s});setStarted(true)}catch(e){setError((e as Error).message)}finally{setBusy(false)}};
- return <details className="panel overview-fold" onToggle={e=>{if(e.currentTarget.open)revealOpened(e.currentTarget)}}><summary><span>Sample walkthrough: missing certificate</span></summary><p>A missing certificate and an unrelated failed synchronization job share a site. Check this false review wording against explicitly selected records:</p><blockquote>The failed synchronization job caused the missing certificate DOC-DEMO-CERT-001.</blockquote><ol><li>Start the isolated journey; open its case and run an investigation.</li><li>Use Check wording, selecting the certificate, unrelated job and cited procedure. Review the unsupported causal claim.</li><li>Review record linkage; missing or conflicting identifiers cannot be confirmed.</li><li>Suggest next question, review uncertainty and convert a question into an unsent request draft.</li><li>Load the correct receipt and updated record. Earlier assessments remain frozen and become stale.</li><li>Reassess selected updated records; a human confirms exact linkage with rationale, verifies current evidence, assesses checks and resolves separately.</li></ol>{error&&<p className="error" role="alert">{error}</p>}<div className="actions"><button type="button" disabled={busy} onClick={()=>stage("start")}>Start evidence-linkage sample</button><button type="button" className="outline" disabled={busy} onClick={()=>stage("updated")}>Load correct receipt and updated record</button>{started&&<a className="button outline" href="/workspace/cases/CASE-LINKAGE-DEMO">Open evidence-linkage sample case</a>}</div><p className="subtle">Only this expiring sample workspace is changed. No answer, external message or resolution is generated automatically.</p></details>
 }

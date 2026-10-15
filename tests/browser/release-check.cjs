@@ -156,16 +156,6 @@ fs.mkdirSync(out, { recursive: true });
     await page.waitForURL("**/workspace");
     await page.waitForLoadState("networkidle");
     report.workspace = (await call("/auth/me")).workspace_id;
-    await button("I reviewed this step · continue").click();
-    await page.reload();
-    await wait(
-      page.getByRole("heading", { name: "Sample walkthrough · 2 of 6" }),
-    );
-    await button("Skip walkthrough").click();
-    await button("Resume sample walkthrough").click();
-    report.interactions.push(
-      "Walkthrough progress persists and resumes after skipping",
-    );
     await go("/workspace/settings");
     await button("Data policy").click();
     await page
