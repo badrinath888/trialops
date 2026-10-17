@@ -5,8 +5,11 @@
 set -euo pipefail
 : "${SMOKE_EMAIL:?}" "${SMOKE_PASSWORD:?}" "${SMOKE_CASE:?}"
 BASE=${BASE:-http://localhost:3001}; jar=$(mktemp); trap 'rm -f "$jar"' EXIT
-code=$(curl -s -o /dev/null -w '%{http_code}' -c "$jar" -H 'Content-Type: application/json' -d "{\"email\":\"$SMOKE_EMAIL\",\"password\":\"$SMOKE_PASSWORD\"}" "$BASE/api/auth/login")
-[ "$code" = 200 ] || { echo "FAIL login $code"; exit 1; }
+# The proxy rejects POSTs whose Origin differs from the app origin; credentials go via stdin as JSON, never argv.
+resp=$(mktemp); trap 'rm -f "$jar" "$resp"' EXIT
+code=$(python3 -c 'import json,os;print(json.dumps({"email":os.environ["SMOKE_EMAIL"],"password":os.environ["SMOKE_PASSWORD"]}))' \
+  | curl -s -o "$resp" -w '%{http_code}' -c "$jar" -H 'Content-Type: application/json' -H "Origin: $BASE" -d @- "$BASE/api/auth/login") || code=000
+[ "$code" = 200 ] || { echo "FAIL login $code: $(python3 -c 'import json,sys;d=json.load(open(sys.argv[1])).get("detail");print(d if isinstance(d,str) else "see server response")' "$resp" 2>/dev/null | head -c 120)"; exit 1; }
 for p in auth/me cases "cases/$SMOKE_CASE" "cases/$SMOKE_CASE/journey" "cases/$SMOKE_CASE/journey/priority" "cases/$SMOKE_CASE/package.json"; do
   code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" "$BASE/api/$p"); echo "$code /api/$p"; [ "$code" = 200 ] || exit 1
 done
