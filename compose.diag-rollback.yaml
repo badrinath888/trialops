@@ -1,0 +1,6 @@
+# Application-only rollback of release 2ea6ec1 (api/worker); no schema change in this release, data untouched.
+services:
+  api:
+    image: trialops-release-api:pre-diag-6610c77
+  worker:
+    image: trialops-release-worker:pre-diag-6610c77
