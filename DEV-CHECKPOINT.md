@@ -118,4 +118,4 @@
   Backup backups/trialops-verified-20261018-135343-81075.dump (restore-verified). Fingerprint backups/fingerprint-pre-2ea6ec1.txt identical after deploy (54 tables rows; 0 source_connections, no source jobs, so no legitimate background drift). Health: api/worker healthy, web 200, 0 errors in startup logs.
   Images before (rollback tags pre-diag-6610c77): api 5c55a453e753, worker 7fa41fb78df9; after: api f1cac1bb6f5f, worker 76befc5c1242; web unchanged 5e8237942829.
   Rollback: docker compose -f compose.yaml -f compose.diag-rollback.yaml up -d --no-deps --no-build --wait api worker (no schema change; the previous images already know source_event jobs, so scripts/rollback-source-events.sh is not needed for this step).
-  Authenticated smoke: pending user run (credentials not available to me): SMOKE_EMAIL/SMOKE_PASSWORD/SMOKE_CASE=CASE-1 bash scripts/live-smoke.sh.
+  Authenticated smoke (run by the user, not me) against 3001 after the 2ea6ec1 deploy: all seven endpoint checks 200, PASS: authenticated smoke, exit=0. Original missing-draft failure remains: not reproduced; cause unresolved.
