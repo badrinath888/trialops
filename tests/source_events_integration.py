@@ -1,6 +1,6 @@
 """Document-processing source automation against the running TEST stack (3002 API + worker only). Synthetic mock sources; fresh expiring demo workspaces removed in finally.
 Run in the test API container: python /app/tests/source_events_integration.py"""
-import sys, json, time, threading, urllib.request, urllib.error
+import os, sys, json, time, threading, urllib.request, urllib.error
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -59,6 +59,67 @@ try:
     P = f'/cases/{CID}/journey'
     A.call(P + '/subject', {'id': str(uuid4()), 'expected_rev': 0, 'document_system': PORTAL, 'document_ref': 'DOC-5001', 'document_version': '2', 'destination_system': HUB, 'binder_ref': 'BND-77'})
     A.call(P + '/outcomes', {'id': str(uuid4()), 'key': str(uuid4()), 'expected_rev': 0, 'description': 'Document processing is complete for the filed version.', 'requirements': [{'stage': 'processing', 'status': 'completed'}], 'required': True, 'remediation_at': ago(48).isoformat()}, 201)
+
+    def diag(cid):
+        """Sanitized failure diagnostics. 'PROCESSING-TIME' comes from rows the worker stored while processing; 'AFTER FAILURE' is read now and may have changed."""
+        def part(f):
+            try: return f()
+            except Exception as e: return 'unavailable: %s' % type(e).__name__
+        evs = sql("SELECT id,external_id,status,reason,attempts,observed_at,received_at,processed_at,result FROM source_events WHERE workspace_id=%s AND case_id=%s ORDER BY received_at", W, cid)
+        out = {'PROCESSING-TIME (stored by the worker)': {
+            'events': [{k: (str(v) if not isinstance(v, (str, int, dict, list, type(None))) else v) for k, v in e.items() if k != 'id'} for e in evs],
+            'jobs': part(lambda: [{k: str(v) for k, v in j.items()} for j in sql("SELECT status,attempts,created_at,started_at,finished_at,error FROM jobs WHERE workspace_id=%s AND kind='source_event' AND target_id = ANY(%s) ORDER BY created_at", W, [str(e['id']) for e in evs])])},
+            'AFTER FAILURE (read now; may have changed)': {
+            'draft_setting': part(lambda: sql('SELECT draft_preparation FROM automation_settings WHERE workspace_id=%s', W)),
+            'owner_role': part(lambda: sql('SELECT role FROM memberships WHERE workspace_id=%s AND user_id=%s', W, UID)[0]['role']),
+            'investigation_runs': part(lambda: count('runs', 'AND case_id=%s', cid)),
+            'journey_subject_rev': part(lambda: sql('SELECT max(rev) AS r FROM journey_subjects WHERE workspace_id=%s AND case_id=%s', W, cid)[0]['r']),
+            'stages': part(lambda: [{'stage': s['stage'], 'assessment': s['assessment'], 'gaps': [g['key'] for g in s['gaps']]} for s in A.call(f'/cases/{cid}/journey')['journey']['stages']]),
+            'priority': part(lambda: (lambda g: {'candidates': [{k: x.get(k) for k in ('key', 'state', 'unresolved', 'excluded')} | {'existing': bool(x.get('existing'))} for x in g['candidates'] + g.get('waiting', [])],
+                                                 'unresolved_checks': [x['key'] for x in g['checks'] if x['applicable'] and not x['resolved']]})(A.call(f'/cases/{cid}/journey/priority'))),
+            'saved_ranking': part(lambda: sql('SELECT rev,created_at FROM journey_prioritizations WHERE workspace_id=%s AND case_id=%s ORDER BY rev DESC LIMIT 1', W, cid)),
+            'assessments': part(lambda: [str(r['created_at']) for r in sql('SELECT created_at FROM journey_assessments WHERE workspace_id=%s AND case_id=%s ORDER BY created_at DESC LIMIT 3', W, cid)]),
+            'requests': part(lambda: sql('SELECT status FROM information_requests WHERE workspace_id=%s AND case_id=%s', W, cid)),
+            'plan_items': part(lambda: sql('SELECT gap_key,request_status FROM journey_plan_items WHERE workspace_id=%s AND case_id=%s', W, cid))}}
+        print('DRAFT-GROUP FAILURE DIAGNOSTICS (no keys, tokens or payloads):', json.dumps(out, default=str, indent=1)[:6000], flush=True)
+    def draft_group(cid='SRC-D', doc='DOC-7001', bnd='BND-91'):
+        try: _draft_group(cid, doc, bnd)
+        except Exception:
+            diag(cid); raise
+    def _draft_group(cid, doc, bnd):
+        reqs0 = count('information_requests')
+        CIDD = cid; mkcase(CIDD); sql("INSERT INTO runs(workspace_id,id,case_id,result,duration_seconds,model) VALUES(%s,%s,%s,%s,0,'test')", W, uuid4(), CIDD, Jsonb({'recommendation': {'status': 'supported', 'evidence_ids': []}, 'sources': []}))
+        A.call(f'/cases/{CIDD}/journey/subject', {'id': str(uuid4()), 'expected_rev': 0, 'document_system': PORTAL, 'document_ref': doc, 'document_version': '1', 'destination_system': HUB, 'binder_ref': bnd})
+        toff = tag(); assert post(KEY, portal(doc, '1', 'WAIT', ago(0.06), 'EX-f' + toff, 'EVT-f' + toff, 3))[0] == 202; settled('EVT-f' + toff)
+        off = ev_of('EVT-f' + toff)['result']; assert off['checks_updated'] >= 1 and off['candidate'] and not off.get('draft') and count('information_requests') == reqs0, 'setting off: suggestion only'
+        reqs0 = count('information_requests')
+        A.call('/sources/automation', {'draft_preparation': True})
+        reqs = reqs0; td = tag(); nd = portal(doc, '1', 'DONE', ago(0.05), 'EX-d' + td, 'EVT-d' + td, 4)
+        assert post(KEY, nd)[0] == 202; assert settled('EVT-d' + td) == 'processed'
+        res = ev_of('EVT-d' + td)['result']
+        assert res['checks_updated'] >= 1
+        if True:
+            dr = res.get('draft'); assert dr and dr['state'] == 'prepared' and dr['unsent'] is True, res
+            rq = sql('SELECT * FROM information_requests WHERE workspace_id=%s AND id=%s', W, dr['request_id'])[0]; assert rq['status'] == 'draft' and rq['contact_id'] is None and count('information_requests') == reqs + 1
+            assert A.call(f'/cases/{CIDD}/watch')['updates'][0]['detail']['draft']['request_id'] == dr['request_id']
+            for _ in range(2): assert post(KEY, nd)[1]['status'] == 'duplicate'
+            assert count('information_requests') == reqs + 1
+            again = tag(); assert post(KEY, portal(doc, '1', 'ERR', ago(0.04), 'EX-d' + again, 'EVT-d' + again, 5))[0] == 202; settled('EVT-d' + again)
+            assert count('information_requests') == reqs + 1, 'an equivalent active draft/request already exists'
+            nd2 = (ev_of('EVT-d' + again)['result'].get('draft') or {}); assert nd2.get('state') == 'not_prepared' and 'already exists' in nd2['reason'], nd2
+            from source_events import prepare_draft  # no candidate at all -> explained, nothing created
+            nc = prepare_draft(W, 'EVT-none', CIDD, {'candidate': None}, None); assert nc['state'] == 'not_prepared' and 'No open check' in nc['reason'] and count('information_requests') == reqs + 1
+        sql("DELETE FROM information_requests WHERE workspace_id=%s AND status='draft'", W)
+        sql("UPDATE memberships SET role='reviewer' WHERE workspace_id=%s AND user_id=%s", W, UID)  # enabling owner lost owner permission
+        tp = tag(); assert post(KEY, portal(doc, '1', 'DONE', ago(0.03), 'EX-p' + tp, 'EVT-p' + tp, 6))[0] == 202; settled('EVT-p' + tp)
+        assert not (ev_of('EVT-p' + tp)['result'].get('draft') or {}).get('request_id'); role('owner')
+        A.call('/sources/automation', {'draft_preparation': False}); assert A.call('/sources')['draft_preparation'] is False
+        passed('drafts are prepared only when the owner setting is on, unsent, contact-less, never duplicated and need the owner’s current permission; off shows the suggestion only')
+    FOCUS = int(os.environ.get('SRC_FOCUS', '0'))  # focused mode: only the draft scenario, N isolated cases (own workspace, own source)
+    if FOCUS:
+        r = A.call('/sources', {'name': 'Mock portal A', 'adapter': 'mock_portal'}, 201); SRC, KEY = r['id'], r['source_key']
+        for i in range(FOCUS): draft_group(f'SRC-F{i}', f'DOC-7{i}01', f'BND-9{i}')
+        print(f'PASS: focused draft scenario x{FOCUS}', flush=True); sys.exit(0)
 
     # ---- 1. source configuration and authentication
     assert A.call('/sources')['sources'] == [] and B.call('/sources')['sources'] == []
@@ -137,8 +198,8 @@ try:
     ta = tag(); amb = portal('DOC-5001', '2', 'DONE', ago(0.5), 'EX-a' + ta, 'EVT-a' + ta); assert post(KEY, amb)[0] == 202; assert settled('EVT-a' + ta) == 'ambiguous' and ev_of('EVT-a' + ta)['reason'] == 'multiple_exact_cases'
     sql("DELETE FROM cases WHERE workspace_id=%s AND id='SRC-2'", W)
     # another workspace's key can never route into this workspace
-    assert post(KEYB, portal('DOC-5001', '2', 'DONE', ago(0.5), 'EX-b' + ta, 'EVT-b' + ta))[0] == 202
-    wait(lambda: sql('SELECT status FROM source_events WHERE workspace_id=%s', WB)[0]['status'] == 'unmatched', 30, 'cross workspace'); assert count('journey_exports', "AND export_ref LIKE 'EX-b%%'") == 0
+    assert post(KEYB, portal('DOC-5001', '2', 'DONE', ago(0.5), 'XB-' + ta, 'EVT-b' + ta))[0] == 202
+    wait(lambda: sql('SELECT status FROM source_events WHERE workspace_id=%s', WB)[0]['status'] == 'unmatched', 30, 'cross workspace'); assert count('journey_exports', "AND export_ref LIKE 'XB-%%'") == 0
     passed('exact routing only: wrong version, unmatched, source-scoped ID collision and ambiguous mappings stay unrouted; reviewer-confirmed link routes on explicit re-evaluation; other workspaces never match')
 
     # ---- 6. out-of-order observation and conflicting sources; history preserved
@@ -171,31 +232,7 @@ try:
     passed('saved request ranking turns stale by existing rules; no refresh and no carried override')
 
     # ---- 8. draft preparation: off -> on, duplicate prevention, authority
-    reqs0 = count('information_requests')
-    CIDD = 'SRC-D'; mkcase(CIDD); sql("INSERT INTO runs(workspace_id,id,case_id,result,duration_seconds,model) VALUES(%s,%s,%s,%s,0,'test')", W, uuid4(), CIDD, Jsonb({'recommendation': {'status': 'supported', 'evidence_ids': []}, 'sources': []}))
-    A.call(f'/cases/{CIDD}/journey/subject', {'id': str(uuid4()), 'expected_rev': 0, 'document_system': PORTAL, 'document_ref': 'DOC-7001', 'document_version': '1', 'destination_system': HUB, 'binder_ref': 'BND-91'})
-    toff = tag(); assert post(KEY, portal('DOC-7001', '1', 'WAIT', ago(0.06), 'EX-f' + toff, 'EVT-f' + toff, 3))[0] == 202; settled('EVT-f' + toff)
-    off = ev_of('EVT-f' + toff)['result']; assert off['checks_updated'] >= 1 and off['candidate'] and not off.get('draft') and count('information_requests') == reqs0, 'setting off: suggestion only'
-    reqs0 = count('information_requests')
-    A.call('/sources/automation', {'draft_preparation': True})
-    reqs = reqs0; td = tag(); nd = portal('DOC-7001', '1', 'DONE', ago(0.05), 'EX-d' + td, 'EVT-d' + td, 4)
-    assert post(KEY, nd)[0] == 202; assert settled('EVT-d' + td) == 'processed'
-    res = ev_of('EVT-d' + td)['result']
-    assert res['checks_updated'] >= 1
-    if True:
-        dr = res.get('draft'); assert dr and dr['state'] == 'prepared' and dr['unsent'] is True, res
-        rq = sql('SELECT * FROM information_requests WHERE workspace_id=%s AND id=%s', W, dr['request_id'])[0]; assert rq['status'] == 'draft' and rq['contact_id'] is None and count('information_requests') == reqs + 1
-        assert A.call(f'/cases/{CIDD}/watch')['updates'][0]['detail']['draft']['request_id'] == dr['request_id']
-        for _ in range(2): assert post(KEY, nd)[1]['status'] == 'duplicate'
-        assert count('information_requests') == reqs + 1
-        again = tag(); assert post(KEY, portal('DOC-7001', '1', 'ERR', ago(0.04), 'EX-d' + again, 'EVT-d' + again, 5))[0] == 202; settled('EVT-d' + again)
-        assert count('information_requests') == reqs + 1, 'an equivalent active draft/request already exists'
-    sql("DELETE FROM information_requests WHERE workspace_id=%s AND status='draft'", W)
-    sql("UPDATE memberships SET role='reviewer' WHERE workspace_id=%s AND user_id=%s", W, UID)  # enabling owner lost owner permission
-    tp = tag(); assert post(KEY, portal('DOC-7001', '1', 'DONE', ago(0.03), 'EX-p' + tp, 'EVT-p' + tp, 6))[0] == 202; settled('EVT-p' + tp)
-    assert not (ev_of('EVT-p' + tp)['result'].get('draft') or {}).get('request_id'); role('owner')
-    A.call('/sources/automation', {'draft_preparation': False}); assert A.call('/sources')['draft_preparation'] is False
-    passed('drafts are prepared only when the owner setting is on, unsent, contact-less, never duplicated and need the owner’s current permission; off shows the suggestion only')
+    draft_group()
 
     # ---- 9. nothing approved, sent, resolved or confirmed
     assert count('information_requests', "AND status NOT IN ('draft','cancelled')") == 0 and count('external_responses') == 0 and count('assessment_decisions') == 0

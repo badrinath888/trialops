@@ -63,8 +63,14 @@ const sql = q => execFileSync('docker', ['exec', '-i', DB, 'psql', '-U', 'trialo
     assert.equal(sql(`select count(*) from case_events where workspace_id='${W}' and event_type='source_update_reviewed'`), '1'); step('keyboard activation records one reviewer action');
     assert.equal(sql(`select status from cases where workspace_id='${W}' and id='SRC-UI'`), 'open'); assert.equal(sql(`select count(*) from information_requests where workspace_id='${W}' and status<>'draft'`), '0');
 
+    // no-draft explanation: store the exact reason the worker writes for an existing equivalent request on this synthetic update, then check the Case watch rendering
+    const reason = 'A request for the suggested check already exists; no new draft was prepared.';
+    sql(`update case_watch_updates set detail=jsonb_set(detail,'{draft}','{"state":"not_prepared","reason":"${reason}"}') where workspace_id='${W}' and source_event_id is not null`);
+    await page.reload(); await page.waitForLoadState('networkidle'); await watch.waitFor();
+    assert((await watch.innerText()).includes('No draft prepared: ' + reason), 'no-draft explanation visible at 1440'); assert(!/An unsent draft request was prepared/.test(await watch.innerText())); step('no-draft explanation shown in Case watch (1440)');
+
     // mobile
-    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300); await noOverflow('case 390'); await watch.screenshot({ path: shots + '/update-390.png' });
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300); await noOverflow('case 390'); await watch.screenshot({ path: shots + '/update-390.png' }); assert((await watch.innerText()).includes('No draft prepared: ' + reason), 'no-draft explanation visible at 390'); step('no-draft explanation shown in Case watch (390)');
     await page.goto(base + '/workspace/settings'); await page.waitForLoadState('networkidle'); await page.getByRole('button', { name: 'Data policy' }).click(); await noOverflow('settings 390');
     await page.getByRole('region', { name: 'Document-processing sources' }).screenshot({ path: shots + '/settings-390.png' }); step('no horizontal overflow at 390px');
     await page.emulateMedia({ reducedMotion: 'reduce' }); assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), true);

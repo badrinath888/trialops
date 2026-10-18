@@ -237,7 +237,7 @@ def process_source_event(job):
     if phase is None:
         return
     result, cid = phase
-    draft = prepare_draft(w, eid, cid, result, src) if result.get("candidate") else None
+    draft = prepare_draft(w, eid, cid, result, src)
     with connect() as c:
         if not holds(c, job):
             return
@@ -300,6 +300,8 @@ def evidence_phase(job, ev, src, compute):
         result = {"phase": "evidence_saved", "export_id": str(export_id), "assessment_id": str(aid), "stages_changed": stages_changed, "checks_updated": nchg,
                   "candidate": ({"key": cand["key"], "stage": cand["stage"], "state": cand["state"], "target": cand["target"], "question": cand["question"], "would_settle": cand["would_settle"],
                                  "existing": cand["existing"], "code": cand["key"].split(":")[0]} if cand else None), "ranking_stale": bool(saved and saved["input_hash"] != pr1["hash"]),
+                  "considered": [{"key": x["key"], "state": x["state"], "existing": bool(x["existing"])} for x in (pr1["candidates"] + pr1["waiting"])[:8]],
+                  "unresolved_checks": [x["key"] for x in pr1["checks"] if x["applicable"] and not x["resolved"]][:12],
                   "older_than_current": not stages_changed and not old}
         c.execute("UPDATE source_events SET case_id=%s,result=%s WHERE workspace_id=%s AND id=%s", (cid, Jsonb(result), w, eid))  # status flips to processed after the draft phase
         if nchg:
@@ -345,8 +347,14 @@ def prepare_draft(w, eid, cid, result, src):
     cand = result["candidate"]
     with connect() as c:
         st = c.execute("SELECT draft_preparation,actor_id FROM automation_settings WHERE workspace_id=%s", (w,)).fetchone()
-    if not st or not st["draft_preparation"] or cand["state"] != "ready" or cand["existing"] or cand["code"] not in SUPPORTED_DRAFT:
+    if not st or not st["draft_preparation"]:
         return None
+    why = ("No open check needs a request, so no draft was prepared." if not cand else
+           "A request for the suggested check already exists; no new draft was prepared." if cand["existing"] else
+           "The suggested check is not ready for a request (%s); no draft was prepared." % cand["state"] if cand["state"] != "ready" else
+           "This kind of check cannot be drafted automatically; the suggestion is shown only." if cand["code"] not in SUPPORTED_DRAFT else None)
+    if why:
+        return {"state": "not_prepared", "reason": why}
     from assessments import fresh_actor
     from journey import Collection, draft_collection
     try:
