@@ -1,0 +1,4 @@
+# Web-only rollback of the wording/clutter release; no schema or API change.
+services:
+  web:
+    image: trialops-release-web:pre-wording-7ec5bb4
