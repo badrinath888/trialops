@@ -1,6 +1,6 @@
 // Fresh expiring samples only; no messages or new model calls.
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const base=process.env.TEST_WEB_URL||'http://localhost:3002',out=process.env.TEST_SCREENSHOT_DIR||path.resolve(__dirname,'../../artifacts/user-workflow/browser');fs.mkdirSync(out,{recursive:true});
+const base=require('./target.cjs')(),out=process.env.TEST_SCREENSHOT_DIR||path.resolve(__dirname,'../../artifacts/user-workflow/browser');fs.mkdirSync(out,{recursive:true});
 (async()=>{const browser=await chromium.launch({headless:true}),ctx=await browser.newContext({viewport:{width:1440,height:950}}),page=await ctx.newPage(),report={states:[],errors:[],externalRequests:[]};page.on('pageerror',e=>report.errors.push(e.message));
 const call=async(p,b)=>{const r=b===undefined?await page.request.get(base+'/api'+p):await page.request.post(base+'/api'+p,{data:b,headers:{Origin:base}});const d=await r.json();assert(r.ok(),p+' '+r.status()+' '+JSON.stringify(d));return d};
 const button=(n,p=page)=>p.getByRole('button',{name:n,exact:true}),wait=l=>l.waitFor({state:'visible',timeout:120000});

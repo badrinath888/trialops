@@ -1,6 +1,6 @@
 // Uses only a newly created expiring sample workspace; never signs into a saved account.
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const base=process.env.TEST_WEB_URL||'http://localhost:3002',out=process.env.TEST_SCREENSHOT_DIR||path.resolve(__dirname,'../../artifacts/assessments/browser');fs.mkdirSync(out,{recursive:true});
+const base=require('./target.cjs')(),out=process.env.TEST_SCREENSHOT_DIR||path.resolve(__dirname,'../../artifacts/assessments/browser');fs.mkdirSync(out,{recursive:true});
 (async()=>{const browser=await chromium.launch({headless:true}),ctx=await browser.newContext({viewport:{width:1440,height:950}}),page=await ctx.newPage(),report={screens:[],errors:[]};page.on('pageerror',e=>report.errors.push(e.message));
 const call=async(p,data)=>{const r=data===undefined?await page.request.get(base+'/api'+p):await page.request.post(base+'/api'+p,{data,headers:{Origin:base}});assert(r.ok(),p+' '+r.status()+' '+await r.text());return r.json()};
 const waitRun=async()=>{for(let i=0;i<180;i++){const d=await call('/cases/CASE-LINKAGE-DEMO');if(d.runs.length)return d.runs[0];await page.waitForTimeout(1000)}throw Error('Run timeout')};

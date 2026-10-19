@@ -3,7 +3,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
-const base = process.env.TEST_WEB_URL || 'http://localhost:3002';
+const base = require('./target.cjs')();
 const DB = process.env.TEST_DB_CONTAINER || 'trialops-release-test-db-1';
 const sql = q => execFileSync('docker', ['exec', '-i', DB, 'psql', '-U', 'trialops', '-d', 'trialops', '-At', '-c', q]).toString().trim();
 (async () => {
@@ -58,7 +58,7 @@ const sql = q => execFileSync('docker', ['exec', '-i', DB, 'psql', '-U', 'trialo
   // 3. readiness
   await page.goto(base + '/workspace/operations'); await page.waitForLoadState('networkidle');
   const rd = page.locator('section[aria-label="Document readiness tracker"]'); await rd.waitFor();
-  await rd.getByRole('button', { name: 'Define required document' }).click(); await rd.getByLabel('Name').fill('Delegation log'); await rd.getByRole('button', { name: 'Save requirement' }).click();
+  await rd.getByRole('button', { name: 'Add requirement' }).click(); await rd.getByLabel('Name').fill('Delegation log'); await rd.getByRole('button', { name: 'Save requirement' }).click();
   await rd.getByText('Missing').first().waitFor(); await rd.getByRole('button', { name: 'Record' }).first().click();
   await rd.getByLabel('Document identity').fill('DEL-LOG-001'); await rd.getByLabel('Document version').fill('3'); await rd.getByLabel(/Date you observed/).fill('2026-10-01'); await rd.getByLabel(/Where it is filed/).fill('TMF 4.2.1');
   await rd.getByRole('button', { name: 'Save record' }).click(); await rd.getByText('Not yet reviewed.').waitFor();
@@ -69,7 +69,7 @@ const sql = q => execFileSync('docker', ['exec', '-i', DB, 'psql', '-U', 'trialo
 
   // 4. procedure impact
   await page.goto(base + '/workspace/knowledge'); await page.waitForLoadState('networkidle');
-  const imp = page.locator('section[aria-label="Procedure change impact review"]'); await imp.waitFor();
+  const imp = page.locator('[aria-label="Procedure change impact review"]'); await imp.waitFor(); if (!(await imp.evaluate(d => d.open))) await imp.locator('summary').first().click();
   await imp.getByLabel('Procedure').selectOption(art); await imp.getByText(/Changed passages \(2\)/).waitFor();
   await imp.getByText(/not AI output/).first().waitFor();
   await imp.getByText('Escalate after 30 minutes.').waitFor();
@@ -89,7 +89,7 @@ const sql = q => execFileSync('docker', ['exec', '-i', DB, 'psql', '-U', 'trialo
 
   // 6. narrow layout
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const [route, sel] of [['/workspace/cases/REC-1', 'section[aria-label="Recurrence and prevention"]'], ['/workspace/operations', 'section[aria-label="Document readiness tracker"]'], ['/workspace/knowledge', 'section[aria-label="Procedure change impact review"]'], ['/workspace/feedback', 'section[aria-label="Feedback queue"]'], ['/workspace/cases', 'section[aria-label="Bulk case actions"], .case-toolbar']]) {
+  for (const [route, sel] of [['/workspace/cases/REC-1', 'section[aria-label="Recurrence and prevention"]'], ['/workspace/operations', 'section[aria-label="Document readiness tracker"]'], ['/workspace/knowledge', '[aria-label="Procedure change impact review"]'], ['/workspace/feedback', 'section[aria-label="Feedback queue"]'], ['/workspace/cases', 'section[aria-label="Bulk case actions"], .case-toolbar']]) {
    await page.goto(base + route); await page.waitForLoadState('networkidle'); await page.locator(sel).first().waitFor(); await noOverflow('390px ' + route);
   }
   step('390px layouts have no page-level horizontal overflow');

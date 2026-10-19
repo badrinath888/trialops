@@ -1,7 +1,7 @@
 // UI-only fixtures exercise states without changing existing records or security paths.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
-const base = process.env.TEST_WEB_URL || 'http://localhost:3002';
+const base = require('./target.cjs')();
 const out = process.env.TEST_SCREENSHOT_DIR || path.resolve(__dirname, '../../artifacts/ui-refinement/states');
 fs.mkdirSync(out, { recursive: true });
 (async () => {

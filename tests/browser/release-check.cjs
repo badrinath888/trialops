@@ -3,7 +3,7 @@ const { chromium } = require("playwright"),
   assert = require("node:assert/strict"),
   fs = require("node:fs"),
   path = require("node:path");
-const base = process.env.TEST_WEB_URL || "http://localhost:3002",
+const base = require('./target.cjs')(),
   out =
     process.env.TEST_SCREENSHOT_DIR ||
     path.resolve(__dirname, "../../artifacts/release/journey");

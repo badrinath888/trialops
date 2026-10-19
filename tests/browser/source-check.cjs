@@ -4,7 +4,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
-const base = process.env.TEST_WEB_URL || 'http://localhost:3002';
+const base = require('./target.cjs')();
 const DB = process.env.TEST_DB_CONTAINER || 'trialops-release-test-db-1';
 const shots = process.env.SHOT_DIR || 'artifacts/source-screenshots';
 const sql = q => execFileSync('docker', ['exec', '-i', DB, 'psql', '-U', 'trialops', '-d', 'trialops', '-At', '-c', q]).toString().trim();

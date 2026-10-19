@@ -2696,3 +2696,8 @@ details.panel.overview-fold details { margin-inline:0; }
 .source-automation .source-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end}.source-automation .source-form label{margin:0}.source-automation .source-form>button{margin:0;min-height:44px;height:44px;white-space:nowrap}
 .source-automation label.check{flex-direction:row;align-items:flex-start;gap:8px;font-weight:400;margin:12px 0}.source-automation label.check input{flex:none;width:18px;height:18px;min-height:0;padding:0;margin:4px 0 0}
 @media(max-width:640px){.source-automation .source-form{grid-template-columns:1fr}.source-automation .source-form>button{justify-self:start}}
+/* Settings: compact lower disclosures (scoped; mirrors .overview-fold) */
+.settings-lower>details{padding:0;margin:0 0 10px;border:1px solid var(--line);border-radius:8px;background:#fffdf9;overflow:hidden}
+.settings-lower>details>summary{min-height:44px;display:flex;align-items:center;padding:6px 14px;margin:0;cursor:pointer;font-weight:600}
+.settings-lower>details>:not(summary){margin-inline:14px}.settings-lower>details[open]>summary{border-bottom:1px solid var(--line);margin-bottom:10px}.settings-lower>details>:last-child{margin-bottom:12px}
+.view-heading .actions .upload-hint{flex-basis:100%;margin:0;line-height:1.4}

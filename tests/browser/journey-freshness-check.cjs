@@ -2,7 +2,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
-const base = process.env.TEST_WEB_URL || 'http://localhost:3002';
+const base = require('./target.cjs')();
 const DB = process.env.TEST_DB_CONTAINER || 'trialops-release-test-db-1';
 const sql = q => execFileSync('docker', ['exec', '-i', DB, 'psql', '-U', 'trialops', '-d', 'trialops', '-At', '-c', q]).toString().trim();
 const __memo = {}; const ago = h => (__memo[h] ||= new Date(Date.now() - h * 3600e3)); // stable per hours so an export and its rows share one instant

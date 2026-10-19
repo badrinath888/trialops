@@ -1,6 +1,6 @@
 // One populated Case watch journey on a fresh expiring sample workspace. No external messages.
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const base=process.env.TEST_WEB_URL||'http://localhost:3002',out=process.env.TEST_SCREENSHOT_DIR||path.resolve(__dirname,'../../artifacts/case-watch/browser');fs.mkdirSync(out,{recursive:true});
+const base=require('./target.cjs')(),out=process.env.TEST_SCREENSHOT_DIR||path.resolve(__dirname,'../../artifacts/case-watch/browser');fs.mkdirSync(out,{recursive:true});
 const CID='CASE-LINKAGE-DEMO';
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH}),ctx=await browser.newContext({viewport:{width:1440,height:950}}),page=await ctx.newPage(),errors=[];
 page.on('pageerror',e=>errors.push(e.message));

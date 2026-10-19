@@ -1,7 +1,7 @@
 // Run against a test installation. Creates a temporary sample workspace (24-hour expiry).
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const base=process.env.TEST_WEB_URL||'http://localhost:3001';
+const base=require('./target.cjs')();
 const out=process.env.TEST_SCREENSHOT_DIR||path.resolve('screenshots');fs.mkdirSync(out,{recursive:true});
 const options={headless:true};
 if(process.env.CHROMIUM_PATH)options.executablePath=process.env.CHROMIUM_PATH;
@@ -10,14 +10,16 @@ if(process.env.CHROMIUM_ARGS)options.args=JSON.parse(process.env.CHROMIUM_ARGS);
  const browser=await chromium.launch(options),context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>{errors.push(e.message);console.error('Browser error:',e.message);});
  page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
- page.on('response',async r=>{if(r.url().includes('/api/')&&r.status()>=400)console.error('API error',r.status(),r.url(),await r.text().catch(()=>''));});
+ // Expected, UI-handled 422: a one-version procedure has nothing to compare, so the impact-review panel shows its own note. Only that exact response is allowed; any other console error still fails.
+ let expected422=0;
+ page.on('response',async r=>{if(!r.url().includes('/api/')||r.status()<400)return;const body=await r.text().catch(()=>'');if(r.status()===422&&/\/api\/knowledge\/[^/?]+\/impact-review$/.test(r.url())&&/Choose two retained versions/.test(body)){expected422++;return}console.error('API error',r.status(),r.url(),body);});
  const visible=locator=>locator.waitFor({state:'visible',timeout:180000});
  const goto=async p=>{await page.goto(base+p);await page.waitForLoadState('networkidle');};
  try{
   await goto('/');await visible(page.getByRole('heading',{name:/Every issue/}));
   await page.screenshot({path:path.join(out,'landing-desktop.png'),fullPage:true});
   await page.getByRole('button',{name:'Explore a sample case',exact:true}).first().click();
-  await page.waitForURL('**/workspace');await visible(page.getByRole('heading',{name:"Workspace overview"}));
+  await page.waitForURL('**/workspace');await visible(page.getByRole('heading',{name:"Overview"}));
   console.log('PASS: public landing and isolated sample onboarding');
   await goto('/workspace/cases/CASE-4');await page.getByRole('button',{name:'Run investigation',exact:true}).click();
   await visible(page.getByRole('heading',{name:'Investigation findings'}));
@@ -67,7 +69,7 @@ if(process.env.CHROMIUM_ARGS)options.args=JSON.parse(process.env.CHROMIUM_ARGS);
   await page.getByLabel('Describe the issue',{exact:true}).fill('Synthetic training certificates were uploaded yesterday but remain missing. A monitoring visit is tomorrow and review is blocked.');
   await page.getByRole('button',{name:'Suggest classification',exact:true}).click();await visible(page.getByText(/Suggested:/));
   await page.getByRole('button',{name:'Use suggestion',exact:true}).click();
-  await page.getByLabel(/^Study/).selectOption('CT-204');await page.getByLabel(/^Research site/).selectOption('SITE-104');
+  await page.getByLabel(/^Study/).selectOption('CT-204');await page.getByLabel(/^Site/).selectOption('SITE-104');
   await page.getByRole('button',{name:'Create case',exact:true}).click();await page.waitForURL('**/workspace/cases/CASE-*');
   await visible(page.getByRole('heading',{name:'Uploaded certificates missing from binder',exact:true}));
   console.log('PASS: reviewed classification, dependent sites, and case creation');
@@ -85,7 +87,7 @@ if(process.env.CHROMIUM_ARGS)options.args=JSON.parse(process.env.CHROMIUM_ARGS);
   await page.getByLabel('Site name',{exact:true}).fill('Synthetic browser site');
   await page.getByLabel('Site study',{exact:true}).selectOption('CT-BROWSER');
   await page.getByRole('button',{name:'Add site',exact:true}).click();await visible(page.getByText('Site context created and linked to the selected study.',{exact:true}));
-  await goto('/workspace/new');await page.getByLabel(/^Study/).selectOption('CT-BROWSER');await page.getByLabel(/^Research site/).selectOption('SITE-BROWSER');
+  await goto('/workspace/new');await page.getByLabel(/^Study/).selectOption('CT-BROWSER');await page.getByLabel(/^Site/).selectOption('SITE-BROWSER');
   console.log('PASS: custom study/site creation and availability in dependent intake selectors');
 
   for(const width of [1440,1024,768,390]){
@@ -96,7 +98,7 @@ if(process.env.CHROMIUM_ARGS)options.args=JSON.parse(process.env.CHROMIUM_ARGS);
   }
   await page.setViewportSize({width:390,height:844});await goto('/');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(out,'landing-mobile.png'),fullPage:true});
-  assert.deepEqual(errors,[]);
+  assert.deepEqual(errors.filter(e=>!(expected422>0&&/status of 422/.test(e)&&expected422--)),[]);
   const blocked=await page.request.post(base+'/api/feedback',{headers:{Origin:'https://wrong-origin.invalid'},data:{rating:5,message:'Cross origin should be blocked'}});assert.equal(blocked.status(),403);
   console.log('PASS: four responsive widths, no uncaught browser errors, and cross-origin write blocking');
  }catch(e){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true});throw e;}finally{await browser.close();}

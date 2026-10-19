@@ -1,7 +1,7 @@
 // Uses a fresh, expiring sample workspace; never signs into an existing account.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
-const base = process.env.TEST_WEB_URL || 'http://localhost:3001';
+const base = require('./target.cjs')();
 const out = process.env.TEST_SCREENSHOT_DIR || path.resolve(__dirname, '../../artifacts/ui-review');
 fs.mkdirSync(out, { recursive: true });
 (async () => {

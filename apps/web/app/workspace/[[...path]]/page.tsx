@@ -296,7 +296,7 @@ export default function Workspace() {
           ) : view === "feedback" ? (
             <Feedback me={me} />
           ) : view === "settings" ? (
-            <><Settings me={me} /><EmailVerification me={me}/><ResponsePolicy me={me}/><SupportDirectory me={me}/></>
+            <><Settings me={me} /><div className="settings-lower"><EmailVerification me={me}/><ResponsePolicy me={me}/><SupportDirectory me={me}/></div></>
           ) : (
             <Empty title="Page not found">
               <Link href="/workspace">Return to overview</Link>
@@ -304,7 +304,7 @@ export default function Workspace() {
           )}
         </main>
         <footer className="app-footer">
-          TrialOps · <Link href="/guide">Guide & data policy</Link>
+          <span>TrialOps</span> <Link href="/guide">Guide & data policy</Link>
         </footer>
       </div>
     </div>
@@ -325,8 +325,7 @@ function Overview({ me }: { me: Row }) {
     <>
       <Heading
         label="OPERATIONS OVERVIEW"
-        title="Workspace overview"
-        description={`Welcome, ${me.name}.`}
+        title="Overview"
       >
         <Link className="button" href="/workspace/new">
           <Icon name="plus" size={17} />
@@ -526,12 +525,10 @@ function Intake() {
       <Heading
         label="OPERATIONS INTAKE"
         title="Submit an issue"
-        description="Tell us what happened."
       />
       <div className="editor-layout intake-layout">
         <form className="panel form-panel" onSubmit={submit}>
           <ErrorBox error={error} />
-          <p className="subtle">Use non-patient operational details.</p>
           <h2>
             <span className="step-num">01</span>What happened?
           </h2>
@@ -558,6 +555,7 @@ function Intake() {
               placeholder="What did you expect, what happened, and what work is affected?"
             />
           </label>
+          <small className="subtle">Use non-patient operational details.</small>
           <button
             className="outline"
             type="button"
@@ -614,7 +612,7 @@ function Intake() {
               </select>
             </label>
             <label>
-              Research site
+              Site
               <select
                 value={site}
                 onChange={(e) => setSite(e.target.value)}
@@ -1544,14 +1542,14 @@ function HistoryList() {
         title="Investigations"
       >
         <Link className="button" href="/workspace/cases">
-          Choose a case to investigate
+          Choose case
         </Link>
       </Heading>
       <ErrorBox error={error} />
       <div className="list-controls">
         <input
           aria-label="Search investigations"
-          placeholder="Search case, title, or run…"
+          placeholder="Search investigations…"
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
@@ -1568,7 +1566,7 @@ function HistoryList() {
         >
           <option value="">All review statuses</option>
           {["pending", "approved", "rejected"].map((s) => (
-            <option key={s}>{s}</option>
+            <option key={s} value={s}>{s === "pending" ? "Awaiting review" : s}</option>
           ))}
         </select>
       </div>
@@ -1597,7 +1595,7 @@ function HistoryList() {
                 </small>
                 <h3>{r.title}</h3>
               </div>
-              <Badge value={r.decision || "pending"} />
+              {r.decision ? <Badge value={r.decision} /> : <span className="badge pending">Awaiting review</span>}
             </Link>
           ))
         )}
@@ -1606,6 +1604,7 @@ function HistoryList() {
         <span role="status">
           {loading ? "Updating results…" : plural(data?.total ?? 0, "investigation")}
         </span>
+        {(offset > 0 || (data && offset + 25 < data.total)) && <>
         <button
           className="outline"
           disabled={loading || !offset}
@@ -1619,7 +1618,7 @@ function HistoryList() {
           onClick={() => setOffset(offset + 25)}
         >
           Next
-        </button>
+        </button></>}
       </div>
     </>
   );
@@ -1794,9 +1793,15 @@ function Knowledge({ me }: { me: Row }) {
             <button className="outline" onClick={() => choose(null)}>
               New procedure
             </button>
-            <button onClick={() => fileInput.current?.click()}>
+            <button
+              onClick={() => fileInput.current?.click()}
+              aria-describedby="upload-limits"
+            >
               Upload procedure
             </button>
+            <small id="upload-limits" className="subtle upload-hint">
+              TXT, Markdown, or text-based PDF · up to 2 MB / 30 pages
+            </small>
           </div>
         )}
       </Heading>
@@ -1815,9 +1820,6 @@ function Knowledge({ me }: { me: Row }) {
               e.target.value = "";
             }}
           />
-          <p className="subtle upload-limits">
-            TXT, Markdown, or text-based PDF · up to 2 MB / 30 pages
-          </p>
         </>
       )}
       <ErrorBox error={error} />
@@ -1886,13 +1888,13 @@ function Knowledge({ me }: { me: Row }) {
               render: (a) => (
                 <>
                   <Badge value={a.archived ? "archived" : "active"} />
-                  <small>
-                    {a.indexing_error
-                      ? "Indexing needs attention"
-                      : a.indexing_status === "queued"
-                        ? "Indexing queued"
-                        : "Search ready"}
-                  </small>
+                  {(a.indexing_error || a.indexing_status === "queued") && (
+                    <small>
+                      {a.indexing_error
+                        ? "Indexing needs attention"
+                        : "Indexing queued"}
+                    </small>
+                  )}
                 </>
               ),
             },
@@ -1900,8 +1902,7 @@ function Knowledge({ me }: { me: Row }) {
         />
       </div>
       <p className="subtle">
-        {plural(visible.length, "procedure")}. Earlier investigations keep the
-        version they used.
+        {plural(visible.length, "procedure")}
       </p>
       {editorOpen && (
         <section
@@ -1990,7 +1991,8 @@ function Knowledge({ me }: { me: Row }) {
               </label>
               <small>
                 {content.length.toLocaleString()} / 50,000 characters. Editing
-                creates a new version.
+                creates a new version; earlier investigations keep the version
+                they used.
               </small>
               {owner && (
                 <div className="actions">
@@ -2101,7 +2103,7 @@ function Operations({ me, after }: { me: Row; after?: React.ReactNode }) {
                     {g.snapshot ? stamp(g.snapshot.observed_at) : "No snapshot"}
                   </p>
                   <details>
-                    <summary>Inspect records</summary>
+                    <summary>View records</summary>
                     {g.records.map((record: Row) => (
                       <dl className="record-fields" key={record.id}>
                         {Object.entries(record).map(([key, value]) => (
@@ -2289,7 +2291,7 @@ function ROI({ me }: { me: Row }) {
       )}
       <div className="editor-layout">
         <form className="panel form-panel" onSubmit={save}>
-          <h2>Scenario for an approved run</h2>
+          <h2>Estimate capacity value</h2>
           <label>
             Approved investigation
             <select
@@ -2308,22 +2310,23 @@ function ROI({ me }: { me: Row }) {
                 ))}
             </select>
           </label>
+          <h3 className="roi-assumptions">Scenario assumptions</h3>
           <div className="form-grid">
             {[
               [
-                "Assumed manual baseline (minutes)",
+                "Manual baseline (minutes)",
                 baseline,
                 setBaseline,
                 1440,
               ],
               [
-                "Assumed AI-assisted human work (minutes)",
+                "AI-assisted human work (minutes)",
                 assisted,
                 setAssisted,
                 1440,
               ],
-              ["Assumed loaded hourly cost (USD)", hourly, setHourly, 10000],
-              ["Assumed AI cost for this run (USD)", cost, setCost, 10000],
+              ["Loaded hourly cost (USD)", hourly, setHourly, 10000],
+              ["AI cost for this run (USD)", cost, setCost, 10000],
             ].map(([label, v, set, max]) => (
               <label key={label as string}>
                 {label as string}
@@ -2375,7 +2378,6 @@ function ROI({ me }: { me: Row }) {
           <p>Estimated minutes of capacity freed</p>
           <h3>{Number.isFinite(value) ? money(value) : "—"}</h3>
           <p>Estimated net capacity value</p>
-          <p className="notice">Scenario estimate · not cash savings</p>
           <details>
             <summary>How this is calculated</summary>
             <p>
@@ -2491,15 +2493,14 @@ function Feedback({ me }: { me: Row }) {
             minLength={10}
             maxLength={2000}
             required
-            placeholder="What worked? Where did you get stuck? What would make this useful?"
+            placeholder="What worked, and what should improve?"
           />
         </label>
         <button disabled={busy || message.trim().length < 10} aria-busy={busy}>
           {busy ? "Saving…" : "Submit feedback"}
         </button>
         <small className="feedback-data-note">
-          Feedback is stored in this deployment for up to 30 days. No email or
-          external message is sent.
+          Stored for up to 30 days.
         </small>
       </form>
       <MyFeedback key={"mine" + seen} />
@@ -2620,7 +2621,6 @@ function Settings({ me }: { me: Row }) {
       <Heading
         label="WORKSPACE SETTINGS"
         title="Workspace settings"
-        description="Your preferences, workspace administration, and data policy."
       />
       <ErrorBox error={error} />
       {message && (
@@ -2653,8 +2653,8 @@ function Settings({ me }: { me: Row }) {
         className="panel preferences-panel"
         hidden={section !== "preferences"}
       >
-        <h2>Your display preferences</h2>
-        <p className="subtle">Saved for this account in this browser.</p>
+        <h2>Display preferences</h2>
+        <p className="subtle">Saved in this browser.</p>
         <div className="preference-row">
           <span>
             <strong>Content spacing</strong>
@@ -2679,7 +2679,6 @@ function Settings({ me }: { me: Row }) {
         <div className="preference-row">
           <span>
             <strong>Default page after sign-in</strong>
-            <small>Choose where to start working.</small>
           </span>
           <PreferenceChoices
             name="display-start-page"

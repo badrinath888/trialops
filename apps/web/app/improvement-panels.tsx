@@ -125,15 +125,19 @@ export function ReadinessTracker({ me }: { me: Row }) {
   const saveReq = (e: React.FormEvent) => { e.preventDefault(); void act(async () => { await api("/readiness/requirements", { id: rq!.id, study_id: study, site_id: rq!.site_id || null, name: rq!.name, guidance: rq!.guidance || "", requires_expiry: !!rq!.requires_expiry, archived: !!rq!.archived, expected_version: rq!.version ?? 0 }); await done("Requirement saved. Records made against an earlier version now need re-review."); }); };
   const edit = (r: Row) => { const rec = r.record; setOk(""); setSel({ ...r, applicable: rec ? rec.applicable : true, reason: rec?.applicability_reason, identity: rec?.document_identity, docv: rec?.document_version, expiry: d10(rec?.expiry_date), asof: d10(rec?.as_of), ref: rec?.evidence?.[0]?.ref }); };
   const counts = data?.counts || {};
+  const addReq = () => { setSel(null); setRq({ id: uid(), name: "", guidance: "", site_id: "", requires_expiry: false, version: 0 }); };
+  const noRows = !!data && data.rows.length === 0;
   return <section className="panel improve-panel" aria-label="Document readiness tracker">
-    <header><h3>Document readiness</h3><small>Required documents by study and site · dated records, not certification</small></header>
+    <header><h3>Document readiness</h3><small>Required documents by study and site</small></header>
     <Msg error={error} ok={ok}/>
     <div className="inline-form"><label>Study<select value={study} onChange={e => { setStudy(e.target.value); setSite(""); }}>{cat?.studies.map((s: Row) => <option key={s.id} value={s.id}>{s.id} · {s.name}</option>)}</select></label>
       <label>Site<select value={site} onChange={e => setSite(e.target.value)}><option value="">All sites</option>{sites.map((s: Row) => <option key={s.id} value={s.id}>{s.id}</option>)}</select></label>
-      {reviewer && <button className="outline" onClick={() => { setSel(null); setRq({ id: uid(), name: "", guidance: "", site_id: "", requires_expiry: false, version: 0 }); }}>Define required document</button>}</div>
-    {!data ? <p role="status">Loading readiness…</p> : <>
+      {reviewer && !noRows && <button className="outline" onClick={addReq}>Add requirement</button>}</div>
+    {!data ? (error ? null : <p role="status">Loading readiness…</p>) : noRows ? <>
+      <details className="subtle"><summary>How statuses are determined</summary><p>These are dated records, not certification.</p><p>{data.interpretation}</p></details>
+      <div className="empty"><h3>No required documents defined</h3><p>{reviewer ? "Define the documents this study or site must have on file." : "A reviewer can define required documents."}</p>{reviewer && <button className="outline" onClick={addReq}>Add requirement</button>}</div></> : <>
       <p className="improve-counts">{["missing", "expired", "awaiting_review", "reviewed", "not_applicable"].map(k => <span key={k} className={"badge status-" + k}>{humanize(k)} {counts[k] || 0}</span>)}</p>
-      <details className="subtle"><summary>How statuses are determined</summary><p>{data.interpretation}</p></details>
+      <details className="subtle"><summary>How statuses are determined</summary><p>These are dated records, not certification.</p><p>{data.interpretation}</p></details>
       <DataTable<Row> label="Document readiness" rows={data.rows} rowKey={r => r.requirement.id + r.site_id} empty={<div className="empty"><h3>No required documents defined</h3><p>{reviewer ? "Define the documents this study or site must have on file." : "A reviewer can define required documents."}</p></div>} columns={[
         { label: "Required document", render: r => <><strong>{r.requirement.name}</strong>{r.requirement.requires_expiry && <small> · expiry required</small>}<small>{r.requirement.guidance}</small></> },
         { label: "Site", render: r => r.site_id },
@@ -247,13 +251,13 @@ export function FeedbackQueue({ me }: { me: Row }) {
     <Msg error={error} ok={ok}/>
     {!q ? <p role="status">Loading feedback…</p> : <>
       <div className="inline-form"><label>Show<select value={filter} onChange={e => setFilter(e.target.value)}><option value="">All states</option>{q.states.map((s: string) => <option key={s} value={s}>{humanize(s)}</option>)}</select></label>
-        <button className="outline" onClick={() => setImp({ id: uid(), title: "", status: "planned", version: 0 })}>New tracked improvement</button></div>
+        <button className="outline" onClick={() => setImp({ id: uid(), title: "", status: "planned", version: 0 })}>Add improvement</button></div>
       {items.length === 0 && <div className="empty"><h3>No feedback in this view</h3></div>}
       {items.map((i: Row) => <article key={i.id} className="work-item"><strong>{i.rating} / 5 · <Status v={i.status}/></strong>{i.confidential && <small> · confidential</small>}<p className="preserve">{i.message}</p>
         <small>{i.submitter || "Former member"} · {stamp(i.created_at)}{i.owner_name ? ` · owner ${i.owner_name}` : ""}{i.status_changed_at ? ` · status since ${stamp(i.status_changed_at)}` : ""}</small>
         <div><button className="outline" onClick={() => setOpen({ ...i })}>Triage</button></div></article>)}
-      <h4>Tracked improvements ({q.improvements.length})</h4>
-      <ul className="improve-list">{q.improvements.map((m: Row) => <li key={m.id}><b>{m.title}</b> <Status v={m.status}/> {m.owner_name && <small>· {m.owner_name}</small>} <button className="text-button" onClick={() => setImp({ ...m })}>Edit</button></li>)}</ul></>}
+      <details><summary>Tracked improvements ({q.improvements.length})</summary>
+      <ul className="improve-list">{q.improvements.map((m: Row) => <li key={m.id}><b>{m.title}</b> <Status v={m.status}/> {m.owner_name && <small>· {m.owner_name}</small>} <button className="text-button" onClick={() => setImp({ ...m })}>Edit</button></li>)}</ul></details></>}
     {open && <form className="improve-plan" onSubmit={saveTriage} aria-label="Triage feedback"><h4>Triage</h4>
       <label>State<select value={open.status} onChange={e => setOpen({ ...open, status: e.target.value })}>{q!.states.map((s: string) => <option key={s} value={s}>{humanize(s)}</option>)}</select></label>
       <label>Owner<select value={open.owner_id || ""} onChange={e => setOpen({ ...open, owner_id: e.target.value })}><option value="">No owner</option>{q!.owners.map((o: Row) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
